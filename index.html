@@ -7,6 +7,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,500;0,9..144,600;1,9..144,500&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.5.0/chart.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <style>
   :root{
     --paper:#ECEBE4;
@@ -146,6 +147,7 @@
   .history-item{border:1px solid var(--line);border-radius:4px;padding:10px 12px;cursor:pointer;}
   .history-item:hover{border-color:var(--brass);}
   .history-item .h-num{font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--brass);}
+  .hist-item-top{display:flex;justify-content:space-between;align-items:flex-start;}
   .history-item .h-client{font-weight:500;font-size:13.5px;margin:3px 0 2px;}
   .history-item .h-meta{font-size:11.5px;color:var(--ink-soft);}
   .history-empty{font-size:12.5px;color:var(--ink-soft);font-style:italic;}
@@ -204,6 +206,8 @@
   .maint-item.maint-soon .maint-next{color:var(--brass);}
   .maint-item.maint-overdue .maint-next{color:var(--danger);}
   .maint-delete{background:none;border:none;color:var(--danger);cursor:pointer;font-size:16px;line-height:1;padding:2px 4px;}
+  .maint-reminder-row{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;padding-top:8px;border-top:1px dashed var(--line);}
+  .maint-reminder-row .btn{font-size:11px;padding:5px 9px;}
 
   @media print{
     body{background:#fff;}
@@ -438,12 +442,14 @@
     <div class="dash-header">
       <h2>📊 Dashboard</h2>
       <div style="display:flex;gap:10px;">
+        <button id="exportDashPdfBtn" class="btn btn-outline btn-small" type="button">🖨️ Exportar a PDF</button>
         <button id="exportDashExcelBtn" class="btn btn-outline btn-small" type="button">⬇ Exportar a Excel</button>
         <button id="closeDash" class="btn btn-ghost btn-small" type="button">Cerrar</button>
       </div>
     </div>
-    <div class="dash-cards" id="dashCards"></div>
     <div class="dash-detail" id="dashDetail" style="display:none;"></div>
+    <div id="dashPrintArea">
+    <div class="dash-cards" id="dashCards"></div>
     <div class="dash-charts">
       <div class="dash-chart-box">
         <h3>Ventas mensuales (cuentas de cobro pagadas)</h3>
@@ -461,6 +467,7 @@
         <h3>Estado de cuentas de cobro</h3>
         <div class="dash-canvas-wrap"><canvas id="chartStatus"></canvas></div>
       </div>
+    </div>
     </div>
   </div>
 </div>
@@ -566,6 +573,7 @@ let catalogCache = [];
 let maintenanceCache = [];
 let maintDescCache = [];
 let docType = 'cotizacion'; // 'cotizacion' | 'cuenta'
+let editingExistingNumber = null;
 
 const $ = id => document.getElementById(id);
 
@@ -1291,6 +1299,34 @@ async function saveMaintenance(){
   }
 }
 
+function sendMaintReminder(id, channel){
+  const m = maintenanceCache.find(x=>x.id===id);
+  if(!m) return;
+  const client = clientsCache.find(c=>c.id===m.clientId);
+  const bizName = $('bizName').value.trim() || 'nuestro equipo técnico';
+  const dateTxt = m.nextDate ? formatDisplayDate(m.nextDate) : 'próximamente';
+  const text = `Hola ${m.clientName}, te escribimos de ${bizName} para recordarte que tienes programado el mantenimiento de "${m.equipment}" para el ${dateTxt}. Quedamos atentos para coordinar la visita.`;
+
+  if(channel === 'whatsapp'){
+    const phoneDigits = client ? (client.phone||'').replace(/[^\d]/g,'') : '';
+    const url = phoneDigits
+      ? `https://wa.me/${phoneDigits}?text=${encodeURIComponent(text)}`
+      : `https://wa.me/?text=${encodeURIComponent(text)}`;
+    window.open(url, '_blank');
+    $('maintStatus').textContent = phoneDigits
+      ? 'Abriendo WhatsApp con el número del cliente.'
+      : 'Este cliente no tiene teléfono guardado — elige el contacto manualmente en WhatsApp.';
+  }else{
+    const email = client ? (client.email||'') : '';
+    const subject = `Recordatorio de mantenimiento — ${m.equipment}`;
+    const url = `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(email)}&su=${encodeURIComponent(subject)}&body=${encodeURIComponent(text)}`;
+    window.open(url, '_blank');
+    $('maintStatus').textContent = email
+      ? 'Abriendo Gmail con el borrador listo.'
+      : 'Este cliente no tiene correo guardado — completa el destinatario en Gmail.';
+  }
+}
+
 async function deleteMaintenance(id){
   if(!confirm('¿Eliminar este registro de mantenimiento? Esta acción no se puede deshacer.')) return;
   try{
@@ -1334,8 +1370,20 @@ function renderMaintList(){
       ${m.desc ? `<div class="maint-desc">${escapeHtml(m.desc)}</div>` : ''}
       <div class="h-meta">Realizado: ${m.date ? formatDisplayDate(m.date) : '—'}</div>
       ${m.nextDate ? `<div class="h-meta maint-next">Próximo: ${formatDisplayDate(m.nextDate)}</div>` : ''}
+      ${m.nextDate ? `
+      <div class="maint-reminder-row">
+        <button class="btn btn-small btn-ghost maint-remind" data-channel="whatsapp" type="button">📱 Recordar por WhatsApp</button>
+        <button class="btn btn-small btn-ghost maint-remind" data-channel="gmail" type="button">✉️ Recordar por Gmail</button>
+      </div>` : ''}
     </div>
   `).join('');
+
+  list.querySelectorAll('.maint-remind').forEach(btn=>{
+    btn.addEventListener('click', e=>{
+      const id = e.target.closest('.maint-item').dataset.id;
+      sendMaintReminder(id, btn.dataset.channel);
+    });
+  });
 
   list.querySelectorAll('.maint-delete').forEach(btn=>{
     btn.addEventListener('click', e=>{
@@ -1549,6 +1597,92 @@ function closeDashboard(){
   $('dashModal').classList.remove('open');
 }
 
+async function exportDashboardPDF(){
+  const btn = $('exportDashPdfBtn');
+  const originalText = btn.textContent;
+
+  if(typeof window.jspdf === 'undefined'){
+    alert('No se pudo cargar la librería para generar el PDF (revisa tu conexión a internet) e intenta de nuevo.');
+    return;
+  }
+
+  btn.textContent = 'Generando PDF...';
+  btn.disabled = true;
+
+  try{
+    const data = computeDashboardData();
+    const { jsPDF } = window.jspdf;
+    const pdf = new jsPDF({ orientation:'portrait', unit:'mm', format:'a4' });
+    const pageWidth = pdf.internal.pageSize.getWidth();
+    const margin = 14;
+    let y = margin;
+
+    // Encabezado
+    pdf.setFont('helvetica', 'bold');
+    pdf.setFontSize(16);
+    pdf.text('Dashboard — ' + ($('bizName').value || 'Cotizador'), margin, y);
+    y += 6;
+    pdf.setFont('helvetica', 'normal');
+    pdf.setFontSize(9);
+    pdf.setTextColor(120,120,120);
+    pdf.text('Generado el ' + new Date().toLocaleDateString('es-CO'), margin, y);
+    pdf.setTextColor(0,0,0);
+    y += 10;
+
+    // Tarjetas resumen (como tabla simple)
+    const cardW = (pageWidth - margin*2 - 12) / 4;
+    const cards = [
+      ['Total cobrado', formatMoney(data.totalPaid)],
+      ['Por cobrar', formatMoney(data.totalPending)],
+      ['Cotizaciones', String(data.countCotizaciones)],
+      ['Cuentas de cobro', String(data.countCuentas)]
+    ];
+    cards.forEach((c, i)=>{
+      const x = margin + i*(cardW+4);
+      pdf.setDrawColor(215,212,200);
+      pdf.rect(x, y, cardW, 20);
+      pdf.setFontSize(7.5);
+      pdf.setTextColor(120,120,120);
+      pdf.text(c[0], x+3, y+7);
+      pdf.setFontSize(11);
+      pdf.setFont('helvetica','bold');
+      pdf.setTextColor(0,0,0);
+      pdf.text(c[1], x+3, y+15);
+      pdf.setFont('helvetica','normal');
+    });
+    y += 28;
+
+    // Gráficos: se toman directamente de los canvas de Chart.js ya dibujados en pantalla
+    const chartIds = ['chartSales','chartQuotesVsBilled','chartTopClients','chartStatus'];
+    const chartTitles = ['Ventas mensuales (pagado)','Cotizado vs. facturado','Top clientes','Estado de cuentas de cobro'];
+    const chartW = (pageWidth - margin*2 - 6) / 2;
+    const chartH = chartW * 0.62;
+
+    chartIds.forEach((id, i)=>{
+      const canvasEl = document.getElementById(id);
+      if(!canvasEl) return;
+      const col = i % 2;
+      const x = margin + col*(chartW+6);
+      if(col===0 && i>0) y += chartH + 12;
+      pdf.setFontSize(9);
+      pdf.setFont('helvetica','bold');
+      pdf.text(chartTitles[i], x, y);
+      try{
+        const imgData = canvasEl.toDataURL('image/png', 1.0);
+        pdf.addImage(imgData, 'PNG', x, y+3, chartW, chartH);
+      }catch(e){ console.error('No se pudo incluir el gráfico', id, e); }
+    });
+
+    pdf.save('dashboard-cotizador.pdf');
+  }catch(err){
+    console.error(err);
+    alert('No se pudo generar el PDF. Intenta de nuevo en unos segundos.');
+  }finally{
+    btn.textContent = originalText;
+    btn.disabled = false;
+  }
+}
+
 function exportDashboardExcel(){
   const data = computeDashboardData();
   const wb = XLSX.utils.book_new();
@@ -1712,6 +1846,8 @@ function setDocType(type){
 
 function resetForm(type){
   type = type || docType || 'cotizacion';
+  editingExistingNumber = null;
+  $('saveBtn').textContent = 'Guardar cotización';
   items = [];
   itemSeq = 0;
   $('clientName').value='';
@@ -1806,12 +1942,13 @@ function renderBilledTable(){
       <td>${escapeHtml(q.client && q.client.name || 'Sin nombre')}</td>
       <td class="b-value">${formatMoney(q.total)}</td>
       <td><button class="billed-status ${paid?'paid':'pending'}" type="button">${paid?'Pagado':'Pendiente'}</button></td>
+      <td><button class="maint-delete" title="Eliminar" type="button">×</button></td>
     </tr>`;
   }).join('');
 
   wrap.innerHTML = `
     <table class="billed-table">
-      <thead><tr><th>Fecha</th><th>Cliente</th><th>Valor</th><th>Estado</th></tr></thead>
+      <thead><tr><th>Fecha</th><th>Cliente</th><th>Valor</th><th>Estado</th><th></th></tr></thead>
       <tbody>${rows}</tbody>
     </table>
     <div class="billed-total"><span>Total pagado</span><span>${formatMoney(totalPaid)}</span></div>
@@ -1821,6 +1958,13 @@ function renderBilledTable(){
     btn.addEventListener('click', e=>{
       const id = e.target.closest('tr').dataset.id;
       togglePaidStatus(id);
+    });
+  });
+  wrap.querySelectorAll('tr .maint-delete').forEach(btn=>{
+    btn.addEventListener('click', async e=>{
+      const id = e.target.closest('tr').dataset.id;
+      await deleteQuoteById(id);
+      renderBilledTable();
     });
   });
 }
@@ -1852,14 +1996,40 @@ function renderHistory(){
   const sorted = [...quotesCache].sort((a,b)=> (b.savedAt||0)-(a.savedAt||0));
   list.innerHTML = sorted.map(q => `
     <div class="history-item" data-id="${q.id}">
-      <div class="h-num">${escapeHtml(q.number)}<span class="type-badge">${q.docType==='cuenta' ? 'Cuenta de cobro' : 'Cotización'}</span></div>
+      <div class="hist-item-top">
+        <div class="h-num">${escapeHtml(q.number)}<span class="type-badge">${q.docType==='cuenta' ? 'Cuenta de cobro' : 'Cotización'}</span></div>
+        <button class="maint-delete hist-delete" title="Eliminar" type="button">×</button>
+      </div>
       <div class="h-client">${escapeHtml(q.client && q.client.name || 'Sin nombre')}</div>
       <div class="h-meta">${q.date ? formatDisplayDate(q.date) : ''} · ${formatMoney(q.total)}</div>
     </div>
   `).join('');
   list.querySelectorAll('.history-item').forEach(el=>{
-    el.addEventListener('click', ()=> loadQuoteById(el.dataset.id));
+    el.addEventListener('click', (e)=>{
+      if(e.target.closest('.hist-delete')) return;
+      loadQuoteById(el.dataset.id);
+    });
+    el.querySelector('.hist-delete').addEventListener('click', (e)=>{
+      e.stopPropagation();
+      deleteQuoteById(el.dataset.id);
+    });
   });
+}
+
+async function deleteQuoteById(id){
+  const q = quotesCache.find(x=>x.id===id);
+  if(!q) return;
+  const label = q.docType==='cuenta' ? 'esta cuenta de cobro' : 'esta cotización';
+  if(!confirm(`¿Eliminar ${label} (${q.number})? Esta acción no se puede deshacer.`)) return;
+  try{
+    quotesCache = quotesCache.filter(x=>x.id!==id);
+    await storageSet(STORAGE_KEY, JSON.stringify(quotesCache), false);
+    if(editingExistingNumber === q.number){
+      editingExistingNumber = null;
+      $('saveBtn').textContent = 'Guardar cotización';
+    }
+    renderHistory();
+  }catch(e){ console.error('No se pudo eliminar el documento', e); }
 }
 
 function loadQuoteById(id){
@@ -1898,6 +2068,8 @@ function loadQuoteById(id){
   $('paymentHint').style.display = loadedType==='cuenta' ? '' : 'none';
   $('paymentFields').style.display = loadedType==='cuenta' ? '' : 'none';
   $('taxRate').disabled = loadedType==='cuenta';
+  editingExistingNumber = q.number;
+  $('saveBtn').textContent = loadedType==='cuenta' ? '💾 Actualizar cuenta de cobro' : '💾 Actualizar cotización';
   renderPreview();
   closeHistoryDrawer();
   const label = loadedType==='cuenta' ? 'Cuenta de cobro cargada' : 'Cotización cargada';
@@ -1931,8 +2103,10 @@ async function saveCurrentQuote(){
     const res = await storageSet(STORAGE_KEY, JSON.stringify(quotesCache), false);
     if(!res) throw new Error('sin respuesta');
     await saveProfile();
-    const label = docType==='cuenta' ? 'Cuenta de cobro guardada' : 'Cotización guardada';
-    $('saveStatus').textContent = label + ' en tu historial.';
+    const wasUpdate = editingExistingNumber === record.number;
+    editingExistingNumber = record.number;
+    const label = docType==='cuenta' ? 'Cuenta de cobro' : 'Cotización';
+    $('saveStatus').textContent = wasUpdate ? `${label} actualizada (mismo número ${record.number}).` : `${label} guardada en tu historial.`;
     renderHistory();
   }catch(e){
     $('saveStatus').textContent = 'No se pudo guardar. Intenta de nuevo.';
@@ -2026,6 +2200,7 @@ $('maintFilterClient').addEventListener('change', renderMaintList);
 $('dashToggle').addEventListener('click', openDashboard);
 $('closeDash').addEventListener('click', closeDashboard);
 $('exportDashExcelBtn').addEventListener('click', exportDashboardExcel);
+$('exportDashPdfBtn').addEventListener('click', exportDashboardPDF);
 $('saveMaintDescBtn').addEventListener('click', saveMaintDescTemplate);
 $('deleteMaintDescBtn').addEventListener('click', deleteMaintDescTemplate);
 $('maintDescPicker').addEventListener('change', e=>{
