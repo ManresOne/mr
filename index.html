@@ -278,7 +278,7 @@
 
   @page{
     size: letter;
-    margin: 15mm 14mm;
+    margin: 3cm 2cm 3cm 4cm;
   }
   @media print{
     body{background:#fff !important;}
@@ -414,10 +414,23 @@
         <summary><svg class="sec-icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#A9834F" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><path d="M14 2v6h6"></path><line x1="9" y1="13" x2="15" y2="13"></line><line x1="9" y1="17" x2="15" y2="17"></line></svg>Contenido de esta propuesta</summary>
         <div class="field-grid">
           <label style="grid-column:1/-1">Alcance del proyecto<textarea id="proposalAlcance" rows="3" placeholder="Describe qué incluye este proyecto/instalación..."></textarea></label>
-          <label>Forma de pago<input id="proposalFormaPago" placeholder="Ej: 60% anticipo y 40% contra entrega"></label>
-          <label>Validez de la oferta<input id="proposalValidez" placeholder="Ej: 8 días"></label>
+          <label>Forma de pago
+            <select id="proposalFormaPago">
+              <option value="70% con la orden de pedido y 30% contra entrega">70% con la orden de pedido y 30% contra entrega</option>
+              <option value="60% con la orden de pedido y 40% contra entrega" selected>60% con la orden de pedido y 40% contra entrega</option>
+              <option value="50% con la orden de pedido y 50% contra entrega">50% con la orden de pedido y 50% contra entrega</option>
+              <option value="100% anticipo">100% anticipo</option>
+            </select>
+          </label>
+          <label>Validez de la oferta
+            <select id="proposalValidez">
+              <option value="3 Días">3 Días</option>
+              <option value="5 Días" selected>5 Días</option>
+              <option value="8 Días">8 Días</option>
+              <option value="15 Días">15 Días</option>
+            </select>
+          </label>
           <label>Tiempo de entrega<input id="proposalEntrega" placeholder="Ej: 3-5 días hábiles"></label>
-          <label>No incluye (opcional)<input id="proposalNoIncluye" placeholder="Ej: Obra civil, andamios..."></label>
           <label style="grid-column:1/-1">Otros aspectos (opcional)<textarea id="proposalOtros" rows="2" placeholder="Cualquier condición adicional específica de este proyecto..."></textarea></label>
         </div>
       </details>
@@ -431,6 +444,7 @@
           <label style="grid-column:1/-1">4. Obligaciones del oferente<textarea id="tplObligacionesOferente" rows="3"></textarea></label>
           <label style="grid-column:1/-1">5. Obligaciones del cliente<textarea id="tplObligacionesCliente" rows="3"></textarea></label>
           <label style="grid-column:1/-1">8. Garantía<textarea id="tplGarantia" rows="3"></textarea></label>
+          <label style="grid-column:1/-1">No incluye (aparece en la tabla de condiciones)<input id="tplNoIncluye"></label>
           <label style="grid-column:1/-1">Cierre<textarea id="tplCierre" rows="2"></textarea></label>
         </div>
       </details>
@@ -1938,7 +1952,6 @@ function renderPreview(){
       formaPago: $('proposalFormaPago').value,
       validez: $('proposalValidez').value,
       entrega: $('proposalEntrega').value,
-      noIncluye: $('proposalNoIncluye').value,
       otros: $('proposalOtros').value
     };
     const contactLine = [biz.phone ? 'Cel: '+biz.phone : '', biz.email ? 'E-mail: '+biz.email : '']
@@ -1965,7 +1978,7 @@ function renderPreview(){
     if(prop.formaPago) condRows.push(['Forma de pago', prop.formaPago]);
     if(prop.validez) condRows.push(['Validez de la oferta', prop.validez]);
     if(prop.entrega) condRows.push(['Tiempo de entrega', prop.entrega]);
-    if(prop.noIncluye) condRows.push(['No incluye', prop.noIncluye]);
+    if(tpl.noIncluye) condRows.push(['No incluye', tpl.noIncluye]);
     const condTableHtml = condRows.length ? `
       <table class="prop-cond-table"><tbody>
         ${condRows.map(([k,v])=>`<tr><td>${escapeHtml(k)}</td><td>${escapeHtml(v)}</td></tr>`).join('')}
@@ -2117,10 +2130,9 @@ function resetForm(type){
   $('extendedProposal').checked = false;
   $('proposalContentBlock').style.display = 'none';
   $('proposalAlcance').value='';
-  $('proposalFormaPago').value='';
-  $('proposalValidez').value='';
+  $('proposalFormaPago').value='60% con la orden de pedido y 40% contra entrega';
+  $('proposalValidez').value='5 Días';
   $('proposalEntrega').value='';
-  $('proposalNoIncluye').value='';
   $('proposalOtros').value='';
   addItem();
   setDocType(type);
@@ -2177,6 +2189,7 @@ const PROPOSAL_TEMPLATE_DEFAULTS = {
   obligacionesOferente: 'Instalación y puesta en marcha de la solución para el cliente. Asignar personal técnico especializado con dedicación exclusiva para el soporte, mantenimiento y atención de cualquier requerimiento. Efectuar la capacitación básica en el manejo y configuración del sistema a los usuarios finales.',
   obligacionesCliente: 'Cumplir con los pagos pactados y en los tiempos establecidos. Suministrar la información necesaria para que el equipo técnico pueda cumplir con las actividades y tareas asignadas de acuerdo con el cronograma. Permitir el acceso del personal asignado para efectuar las labores de verificación de los equipos e instalación del sistema.',
   garantia: 'El período de garantía es de un (1) año por fallas en los dispositivos, directamente con el fabricante. La garantía no aplica si se destapa el dispositivo para revisión por personal ajeno al servicio técnico del fabricante, o si el equipo presenta golpes. Adicionalmente, no se responde por la pérdida de información que se presente por daño en el equipo donde se encuentra instalado el programa.',
+  noIncluye: 'Obra civil, alquiler de andamios y/o escaleras, en caso de necesitarse se cotizará por separado.',
   cierre: 'Con gusto resolveré cualquier inquietud al respecto.'
 };
 
@@ -2191,6 +2204,7 @@ async function loadProposalTemplate(){
   $('tplObligacionesOferente').value = tpl.obligacionesOferente;
   $('tplObligacionesCliente').value = tpl.obligacionesCliente;
   $('tplGarantia').value = tpl.garantia;
+  $('tplNoIncluye').value = tpl.noIncluye;
   $('tplCierre').value = tpl.cierre;
 }
 
@@ -2202,6 +2216,7 @@ async function saveProposalTemplate(){
       obligacionesOferente: $('tplObligacionesOferente').value,
       obligacionesCliente: $('tplObligacionesCliente').value,
       garantia: $('tplGarantia').value,
+      noIncluye: $('tplNoIncluye').value,
       cierre: $('tplCierre').value
     }), false);
   }catch(e){ console.error('No se pudo guardar la plantilla de propuesta', e); }
@@ -2366,10 +2381,9 @@ function loadQuoteById(id){
   $('proposalContentBlock').style.display = (loadedType==='cotizacion' && q.extendedProposal) ? '' : 'none';
   const prop = q.proposal || {};
   $('proposalAlcance').value = prop.alcance || '';
-  $('proposalFormaPago').value = prop.formaPago || '';
-  $('proposalValidez').value = prop.validez || '';
+  $('proposalFormaPago').value = prop.formaPago || '60% con la orden de pedido y 40% contra entrega';
+  $('proposalValidez').value = prop.validez || '5 Días';
   $('proposalEntrega').value = prop.entrega || '';
-  $('proposalNoIncluye').value = prop.noIncluye || '';
   $('proposalOtros').value = prop.otros || '';
   items = (q.items||[]).map(it=>({...it}));
   itemSeq = items.length;
@@ -2435,7 +2449,6 @@ async function saveCurrentQuote(){
       formaPago: $('proposalFormaPago').value,
       validez: $('proposalValidez').value,
       entrega: $('proposalEntrega').value,
-      noIncluye: $('proposalNoIncluye').value,
       otros: $('proposalOtros').value
     },
     total: t.total,
@@ -2545,7 +2558,7 @@ function buildPdfFilename(){
 
 $('printBtn').addEventListener('click', ()=>{
   document.title = buildPdfFilename();
-  window.print();
+  setTimeout(()=> window.print(), 80);
 });
 window.addEventListener('afterprint', ()=>{ document.title = APP_TITLE; });
 $('mobilePreviewToggle').addEventListener('click', ()=>{
@@ -2588,15 +2601,18 @@ $('maintDescPicker').addEventListener('change', e=>{
 document.querySelectorAll('#docTypeToggle button').forEach(btn=>{
   btn.addEventListener('click', ()=> setDocType(btn.dataset.type));
 });
-['bizName','bizId','bizEmail','bizPhone','bizAddress','bizCity','clientName','clientCompany','clientNit','clientAddress','clientEmail','clientPhone','quoteDate','quoteValid','notes','taxRate','discountRate','payBank','payAccType','payAccNumber','proposalAlcance','proposalFormaPago','proposalValidez','proposalEntrega','proposalNoIncluye','proposalOtros','tplIntro','tplPresentacion','tplObligacionesOferente','tplObligacionesCliente','tplGarantia','tplCierre']
+['bizName','bizId','bizEmail','bizPhone','bizAddress','bizCity','clientName','clientCompany','clientNit','clientAddress','clientEmail','clientPhone','quoteDate','quoteValid','notes','taxRate','discountRate','payBank','payAccType','payAccNumber','proposalAlcance','proposalEntrega','proposalOtros','tplIntro','tplPresentacion','tplObligacionesOferente','tplObligacionesCliente','tplGarantia','tplNoIncluye','tplCierre']
   .forEach(id => $(id).addEventListener('input', renderPreview));
+
+['proposalFormaPago','proposalValidez']
+  .forEach(id => $(id).addEventListener('change', renderPreview));
 
 $('extendedProposal').addEventListener('change', ()=>{
   $('proposalContentBlock').style.display = $('extendedProposal').checked ? '' : 'none';
   renderPreview();
 });
 
-['tplIntro','tplPresentacion','tplObligacionesOferente','tplObligacionesCliente','tplGarantia','tplCierre']
+['tplIntro','tplPresentacion','tplObligacionesOferente','tplObligacionesCliente','tplGarantia','tplNoIncluye','tplCierre']
   .forEach(id => $(id).addEventListener('blur', saveProposalTemplate));
 
 $('uploadSignatureBtn').addEventListener('click', ()=> $('signatureInput').click());
