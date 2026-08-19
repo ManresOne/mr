@@ -482,11 +482,13 @@
       </details>
 
       <details class="settings-block" id="taxBlock">
-        <summary><svg class="sec-icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#A9834F" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="5" x2="5" y2="19"></line><circle cx="6.5" cy="6.5" r="2.5"></circle><circle cx="17.5" cy="17.5" r="2.5"></circle></svg>IVA y descuento</summary>
+        <summary><svg class="sec-icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#A9834F" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="5" x2="5" y2="19"></line><circle cx="6.5" cy="6.5" r="2.5"></circle><circle cx="17.5" cy="17.5" r="2.5"></circle></svg>IVA, descuento y anticipo</summary>
         <div class="field-grid">
           <label>IVA % (solo si tú facturas con IVA)<input id="taxRate" type="number" min="0" value="0"></label>
           <label>Descuento %<input id="discountRate" type="number" min="0" value="0"></label>
+          <label>Anticipo recibido ($)<input id="advanceAmount" type="number" min="0" value="0" placeholder="0"></label>
         </div>
+        <p class="field-hint" style="display:block;margin-top:8px;">Si el cliente ya te entregó un anticipo, ponlo aquí — se resta del total y se muestra el saldo pendiente. Aplica sobre todo en cuentas de cobro.</p>
       </details>
 
       <details class="settings-block" id="notesBlock">
@@ -856,7 +858,9 @@ function getTotals(){
   const afterDiscount = subtotal - subtotal*discountRate/100;
   const tax = afterDiscount*taxRate/100;
   const total = afterDiscount + tax;
-  return {subtotal, discountRate, taxRate, tax, total, afterDiscount};
+  const advance = Number($('advanceAmount').value)||0;
+  const balanceDue = total - advance;
+  return {subtotal, discountRate, taxRate, tax, total, afterDiscount, advance, balanceDue};
 }
 
 let selectedClientId = '';
@@ -2029,6 +2033,8 @@ function renderPreview(){
       ${t.discountRate>0 ? `<div class="totals-row"><span>Descuento (${t.discountRate}%)</span><span>-${formatMoney(t.subtotal - t.afterDiscount)}</span></div>` : ''}
       ${t.taxRate>0 ? `<div class="totals-row"><span>IVA (${t.taxRate}%)</span><span>${formatMoney(t.tax)}</span></div>` : ''}
       <div class="totals-row grand"><span>Total</span><span>${formatMoney(t.total)}</span></div>
+      ${t.advance>0 ? `<div class="totals-row"><span>Anticipo recibido</span><span>-${formatMoney(t.advance)}</span></div>
+      <div class="totals-row grand" style="color:var(--teal);"><span>Saldo pendiente</span><span>${formatMoney(t.balanceDue)}</span></div>` : ''}
     </div>
     ${proposalBottomHtml}
     ${!isExtended && isAccount ? `
@@ -2123,6 +2129,7 @@ function resetForm(type){
   $('taxRate').value = 0;
   $('taxRate').disabled = type==='cuenta';
   $('discountRate').value = 0;
+  $('advanceAmount').value = 0;
   $('payBank').value='';
   $('payAccType').value='';
   $('payAccNumber').value='';
@@ -2373,6 +2380,7 @@ function loadQuoteById(id){
   $('taxRate').dataset.prevValue = q.taxRate ?? 19;
   $('taxRate').value = loadedType==='cuenta' ? 0 : (q.taxRate ?? 19);
   $('discountRate').value = q.discountRate ?? 0;
+  $('advanceAmount').value = q.advance ?? 0;
   $('payBank').value = q.bank && q.bank.bank || '';
   $('payAccType').value = q.bank && q.bank.accType || '';
   $('payAccNumber').value = q.bank && q.bank.accNumber || '';
@@ -2441,6 +2449,7 @@ async function saveCurrentQuote(){
     items: items.map(i=>({...i})),
     taxRate: Number($('taxRate').value)||0,
     discountRate: Number($('discountRate').value)||0,
+    advance: Number($('advanceAmount').value)||0,
     bank: { bank: $('payBank').value, accType: $('payAccType').value, accNumber: $('payAccNumber').value },
     notes: $('notes').value,
     extendedProposal: docType==='cotizacion' ? $('extendedProposal').checked : false,
@@ -2601,7 +2610,7 @@ $('maintDescPicker').addEventListener('change', e=>{
 document.querySelectorAll('#docTypeToggle button').forEach(btn=>{
   btn.addEventListener('click', ()=> setDocType(btn.dataset.type));
 });
-['bizName','bizId','bizEmail','bizPhone','bizAddress','bizCity','clientName','clientCompany','clientNit','clientAddress','clientEmail','clientPhone','quoteDate','quoteValid','notes','taxRate','discountRate','payBank','payAccType','payAccNumber','proposalAlcance','proposalEntrega','proposalOtros','tplIntro','tplPresentacion','tplObligacionesOferente','tplObligacionesCliente','tplGarantia','tplNoIncluye','tplCierre']
+['bizName','bizId','bizEmail','bizPhone','bizAddress','bizCity','clientName','clientCompany','clientNit','clientAddress','clientEmail','clientPhone','quoteDate','quoteValid','notes','taxRate','discountRate','advanceAmount','payBank','payAccType','payAccNumber','proposalAlcance','proposalEntrega','proposalOtros','tplIntro','tplPresentacion','tplObligacionesOferente','tplObligacionesCliente','tplGarantia','tplNoIncluye','tplCierre']
   .forEach(id => $(id).addEventListener('input', renderPreview));
 
 ['proposalFormaPago','proposalValidez']
@@ -2649,7 +2658,8 @@ $('disconnectSyncBtn').addEventListener('click', disconnectSync);
 // 1) Reemplaza estos dos correos por los de las 2 personas autorizadas.
 const ALLOWED_EMAILS = [
   'manuelrestrepo@gmail.com',
-  'mrsistemasyservicios@gmail.com'
+  'mrsistemasyservicios@gmail.com',
+  'linam0621@gmail.com'
 ];
 // 2) Reemplaza esto con tu Client ID de Google Cloud Console (ver instrucciones).
 const GOOGLE_CLIENT_ID = '205283610798-5fg1so4k7l8409id93l4325qt2gqvhqu.apps.googleusercontent.com';
