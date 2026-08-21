@@ -148,7 +148,7 @@
   .save-status{font-size:12px;color:var(--teal);min-height:16px;margin:8px 0 0;}
 
   /* Preview */
-  .preview-panel{background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:40px 34px 36px;position:relative;overflow:hidden;min-height:520px;}
+  .preview-panel{background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:40px 34px 36px;position:relative;z-index:0;overflow:hidden;min-height:520px;}
   .preview-panel::before{
     content:'';position:absolute;top:50%;left:50%;width:360px;height:360px;
     transform:translate(-50%,-50%);
@@ -301,6 +301,7 @@
     }
   }
   @media print{
+    *{-webkit-print-color-adjust:exact !important;print-color-adjust:exact !important;color-adjust:exact !important;}
     body{background:#fff !important;}
     .app-header,.form-panel,.history-drawer,.history-overlay,.maint-drawer,#maintOverlay,.dash-modal,.mobile-preview-toggle,.login-gate{display:none !important;}
     .app{padding:0;max-width:100%;background:#fff;}
@@ -2959,9 +2960,8 @@ $('disconnectSyncBtn').addEventListener('click', disconnectSync);
 // ===== Acceso restringido con Google Sign-In =====
 // 1) Reemplaza estos dos correos por los de las 2 personas autorizadas.
 const ALLOWED_EMAILS = [
-  'manuelrestrepo@gmail.com',
-  'mrsistemasyservicios@gmail.com',
-  'linam0621@gmail.com'
+  ''manuelrestrepo@gmail.com',
+  'mrsistemasyservicios@gmail.com'
 ];
 // 2) Reemplaza esto con tu Client ID de Google Cloud Console (ver instrucciones).
 const GOOGLE_CLIENT_ID = '205283610798-5fg1so4k7l8409id93l4325qt2gqvhqu.apps.googleusercontent.com';
