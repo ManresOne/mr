@@ -148,7 +148,7 @@
   .save-status{font-size:12px;color:var(--teal);min-height:16px;margin:8px 0 0;}
 
   /* Preview */
-  .preview-panel{background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:40px 34px 36px;position:relative;z-index:0;overflow:hidden;min-height:520px;}
+  .preview-panel{background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:48px 34px 36px;position:relative;z-index:0;overflow:hidden;min-height:520px;}
   .preview-panel::before{
     content:'';position:absolute;top:50%;left:50%;width:360px;height:360px;
     transform:translate(-50%,-50%);
@@ -156,7 +156,7 @@
     opacity:0.05;pointer-events:none;z-index:-1;
   }
   .doc-top-band{position:absolute;top:0;left:0;right:0;height:6px;background:linear-gradient(90deg,var(--brass),var(--teal));}
-  .doc-masthead-doctype{display:inline-block;font-family:'IBM Plex Sans',sans-serif;font-weight:600;font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:#fff;background:var(--brass);padding:4px 12px;border-radius:10px;margin-bottom:8px;}
+  .doc-masthead-doctype{display:inline-block;font-family:'IBM Plex Sans',sans-serif;font-weight:600;font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:#fff;background:var(--brass);padding:4px 12px;border-radius:10px;margin:0 0 8px;}
   .doc-masthead{display:grid;grid-template-columns:1.1fr 1fr;gap:36px;margin-bottom:28px;padding-bottom:22px;border-bottom:1.5px solid var(--ink);}
   .doc-masthead-left{display:flex;flex-direction:column;}
   .doc-masthead-logo{max-height:50px;max-width:180px;width:auto;object-fit:contain;object-position:left top;margin-bottom:14px;}
@@ -184,7 +184,9 @@
 
   .doc-notes{margin-top:26px;padding-top:16px;border-top:1px dashed var(--line);font-size:12px;color:var(--ink-soft);white-space:pre-wrap;}
   .contact-icon{flex-shrink:0;margin-right:5px;vertical-align:-1.5px;color:var(--brass);}
-  .doc-footer{margin-top:32px;padding-top:14px;border-top:1px solid var(--line);display:flex;flex-wrap:wrap;justify-content:center;align-items:center;gap:6px 18px;font-size:10px;color:var(--ink-soft);text-align:center;}
+  .doc-footer{margin-top:32px;padding-top:14px;border-top:1px solid var(--line);font-size:10px;color:var(--ink-soft);text-align:center;}
+  .doc-footer-line{margin-bottom:6px;}
+  .doc-footer-contact{display:flex;flex-wrap:wrap;justify-content:center;align-items:center;gap:6px 20px;}
   .doc-footer-item{display:inline-flex;align-items:center;white-space:nowrap;}
   .doc-footer-item .contact-icon{color:var(--ink-soft);}
 
@@ -2238,9 +2240,11 @@ function renderPreview(){
     ` : ''}
     ${!isExtended ? `<div class="doc-notes">${escapeHtml($('notes').value)}</div>` : ''}
     <div class="doc-footer">
-      <span>Soporte técnico especializado, venta, reparación y mantenimiento de equipos de cómputo.</span>
-      ${biz.email ? `<span class="doc-footer-item"><svg class="contact-icon" viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"></rect><path d="m2 7 10 6 10-6"></path></svg>${escapeHtml(biz.email)}</span>`:''}
-      ${biz.phone ? `<span class="doc-footer-item"><svg class="contact-icon" viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 5a2 2 0 0 1 2-2h3l2 5-2.5 1.5a11 11 0 0 0 5 5L14 12l5 2v3a2 2 0 0 1-2 2A16 16 0 0 1 3 5z"></path></svg>WhatsApp: ${escapeHtml(biz.phone)}</span>`:''}
+      <div class="doc-footer-line">Soporte técnico especializado, venta, reparación y mantenimiento de equipos de cómputo.</div>
+      <div class="doc-footer-contact">
+        ${biz.email ? `<span class="doc-footer-item"><svg class="contact-icon" viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"></rect><path d="m2 7 10 6 10-6"></path></svg>${escapeHtml(biz.email)}</span>`:''}
+        ${biz.phone ? `<span class="doc-footer-item"><svg class="contact-icon" viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 5a2 2 0 0 1 2-2h3l2 5-2.5 1.5a11 11 0 0 0 5 5L14 12l5 2v3a2 2 0 0 1-2 2A16 16 0 0 1 3 5z"></path></svg>WhatsApp: ${escapeHtml(biz.phone)}</span>`:''}
+      </div>
     </div>
   `;
 }
