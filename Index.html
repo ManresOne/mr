@@ -181,7 +181,7 @@
   .doc-table th:last-child,.doc-table td:last-child{text-align:right;}
   .doc-table td{padding:9px 0;border-bottom:1px solid var(--line);font-size:13.5px;}
   .doc-item-desc{display:flex;align-items:center;gap:10px;}
-  .doc-item-thumb{width:42px;height:42px;object-fit:cover;border-radius:4px;border:1px solid var(--line);flex-shrink:0;}
+  .doc-item-thumb{width:42px;height:42px;object-fit:contain;background:#fff;border-radius:4px;border:1px solid var(--line);flex-shrink:0;}
   .doc-table .cell-amount{font-family:'IBM Plex Mono',monospace;}
   .doc-empty-row td{color:var(--ink-soft);font-style:italic;font-size:12.5px;}
 
@@ -890,6 +890,7 @@ function toggleItemImage(id){
 function handleItemImageUpload(id, file){
   const it = items.find(i=>i.id===id);
   if(!it) return;
+  const isPng = file.type === 'image/png';
   const reader = new FileReader();
   reader.onload = (e) => {
     const img = new Image();
@@ -901,7 +902,7 @@ function handleItemImageUpload(id, file){
       canvas.height = img.height * scale;
       const ctx = canvas.getContext('2d');
       ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-      it.image = canvas.toDataURL('image/jpeg', 0.7);
+      it.image = isPng ? canvas.toDataURL('image/png') : canvas.toDataURL('image/jpeg', 0.7);
       it.imgOpen = true;
       renderItems();
       renderPreview();
