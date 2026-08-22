@@ -131,6 +131,11 @@
   .items-empty{font-size:12.5px;color:var(--ink-soft);font-style:italic;padding:10px 0;}
   .items-head{display:grid;grid-template-columns:1fr 56px 84px 84px 24px 24px;gap:8px;font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:1px;text-transform:uppercase;color:var(--ink-soft);margin-bottom:2px;}
   .item-calc{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;background:#F6F5F0;border-radius:4px;padding:10px 10px 8px;margin-top:6px;}
+  .img-toggle{background:#FBFAF7;border:1px solid var(--line);border-radius:3px;color:var(--brass);cursor:pointer;font-size:12px;padding:0;width:24px;height:24px;line-height:1;}
+  .img-toggle.active,.img-toggle.has-image{background:var(--brass);color:#fff;border-color:var(--brass);}
+  .item-img-panel{align-items:center;gap:10px;background:#F6F5F0;border-radius:4px;padding:10px;margin-top:6px;}
+  .item-img-panel .ii-preview{max-width:90px;max-height:90px;border-radius:4px;border:1px solid var(--line);object-fit:cover;}
+  .item-img-actions{display:flex;gap:8px;flex-wrap:wrap;}
   .item-calc label{font-size:10px;gap:3px;}
   .item-calc input{padding:6px 7px;font-size:12px;}
   .item-calc-result{grid-column:1/-1;display:flex;justify-content:space-between;align-items:center;font-family:'IBM Plex Mono',monospace;font-size:12.5px;font-weight:600;color:var(--ink);padding-top:6px;margin-top:2px;border-top:1px dashed var(--line);}
@@ -175,6 +180,8 @@
   .doc-table th{text-align:left;font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:1px;text-transform:uppercase;color:var(--ink-soft);border-bottom:1.5px solid var(--ink);padding:0 0 8px;}
   .doc-table th:last-child,.doc-table td:last-child{text-align:right;}
   .doc-table td{padding:9px 0;border-bottom:1px solid var(--line);font-size:13.5px;}
+  .doc-item-desc{display:flex;align-items:center;gap:10px;}
+  .doc-item-thumb{width:42px;height:42px;object-fit:cover;border-radius:4px;border:1px solid var(--line);flex-shrink:0;}
   .doc-table .cell-amount{font-family:'IBM Plex Mono',monospace;}
   .doc-empty-row td{color:var(--ink-soft);font-style:italic;font-size:12.5px;}
 
@@ -814,6 +821,7 @@ function renderItems(){
   list.innerHTML = items.map(i => {
     const c = i.calc || {};
     const open = !!c.open;
+    const imgOpen = !!i.imgOpen;
     return `
     <div class="item-block" data-id="${i.id}">
       <div class="item-row">
@@ -822,6 +830,7 @@ function renderItems(){
         <input class="it-price" type="number" min="0" value="${i.price}">
         <span class="item-amount">${formatMoney(i.qty*i.price)}</span>
         <button class="calc-toggle${open?' active':''}" title="Calcular precio con IVA de proveedor" type="button">🧮</button>
+        <button class="img-toggle${imgOpen?' active':''}${i.image?' has-image':''}" title="Agregar imagen del producto" type="button">🖼️</button>
         <button class="item-remove" title="Eliminar" type="button">×</button>
       </div>
       <div class="item-calc" style="display:${open?'grid':'none'}">
@@ -830,6 +839,14 @@ function renderItems(){
         <label>Margen $<input class="ic-marginval" type="number" min="0" value="${c.marginVal ?? ''}" placeholder="0"></label>
         <label>Margen %<input class="ic-marginpct" type="number" min="0" value="${c.marginPct ?? ''}" placeholder="0"></label>
         <div class="item-calc-result"><span>Precio calculado (con IVA del proveedor incluido, sin mostrarlo)</span><span class="ic-result">${formatMoney(i.price)}</span></div>
+      </div>
+      <div class="item-img-panel" style="display:${imgOpen?'flex':'none'}">
+        <input type="file" class="ii-file" accept="image/*" style="display:none;">
+        ${i.image ? `<img class="ii-preview" src="${i.image}" alt="">` : ''}
+        <div class="item-img-actions">
+          <button class="btn btn-small btn-ghost ii-upload" type="button">${i.image ? '🔄 Cambiar imagen' : '📤 Subir imagen'}</button>
+          ${i.image ? `<button class="btn btn-small btn-text ii-remove" type="button">Quitar imagen</button>` : ''}
+        </div>
       </div>
     </div>
   `;
@@ -843,13 +860,66 @@ function renderItems(){
     row.querySelector('.it-price').addEventListener('input', e=>{ updateItem(id,'price', Number(e.target.value)||0); });
     row.querySelector('.item-remove').addEventListener('click', ()=> removeItem(id));
     row.querySelector('.calc-toggle').addEventListener('click', ()=> toggleItemCalc(id));
+    row.querySelector('.img-toggle').addEventListener('click', ()=> toggleItemImage(id));
 
     const calcPanel = block.querySelector('.item-calc');
     ['ic-cost','ic-iva','ic-marginval','ic-marginpct'].forEach(cls=>{
       calcPanel.querySelector('.'+cls).addEventListener('input', ()=> recomputeItemCalc(id));
     });
+
+    const imgPanel = block.querySelector('.item-img-panel');
+    const fileInput = imgPanel.querySelector('.ii-file');
+    imgPanel.querySelector('.ii-upload').addEventListener('click', ()=> fileInput.click());
+    fileInput.addEventListener('change', e=>{
+      const file = e.target.files[0];
+      if(file) handleItemImageUpload(id, file);
+      e.target.value = '';
+    });
+    const removeBtn = imgPanel.querySelector('.ii-remove');
+    if(removeBtn) removeBtn.addEventListener('click', ()=> removeItemImage(id));
   });
 }
+
+function toggleItemImage(id){
+  const it = items.find(i=>i.id===id);
+  if(!it) return;
+  it.imgOpen = !it.imgOpen;
+  renderItems();
+}
+
+function handleItemImageUpload(id, file){
+  const it = items.find(i=>i.id===id);
+  if(!it) return;
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    const img = new Image();
+    img.onload = () => {
+      const maxW = 260;
+      const scale = Math.min(1, maxW / img.width);
+      const canvas = document.createElement('canvas');
+      canvas.width = img.width * scale;
+      canvas.height = img.height * scale;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+      it.image = canvas.toDataURL('image/jpeg', 0.7);
+      it.imgOpen = true;
+      renderItems();
+      renderPreview();
+      $('saveStatus').textContent = 'Imagen añadida al ítem. Recuerda guardar la cotización.';
+    };
+    img.src = e.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+
+function removeItemImage(id){
+  const it = items.find(i=>i.id===id);
+  if(!it) return;
+  delete it.image;
+  renderItems();
+  renderPreview();
+}
+
 
 function toggleItemCalc(id){
   const it = items.find(i=>i.id===id);
@@ -2080,7 +2150,12 @@ function renderPreview(){
 
   const rowsHtml = items.length ? items.map(i=>`
     <tr>
-      <td>${escapeHtml(i.desc) || '<span style="color:var(--ink-soft)">Sin descripción</span>'}</td>
+      <td>
+        <div class="doc-item-desc">
+          ${i.image ? `<img class="doc-item-thumb" src="${i.image}" alt="">` : ''}
+          <span>${escapeHtml(i.desc) || '<span style="color:var(--ink-soft)">Sin descripción</span>'}</span>
+        </div>
+      </td>
       <td class="cell-amount">${i.qty}</td>
       <td class="cell-amount">${formatMoney(i.price)}</td>
       <td class="cell-amount">${formatMoney(i.qty*i.price)}</td>
@@ -2965,8 +3040,7 @@ $('disconnectSyncBtn').addEventListener('click', disconnectSync);
 // 1) Reemplaza estos dos correos por los de las 2 personas autorizadas.
 const ALLOWED_EMAILS = [
   'manuelrestrepo@gmail.com',
-  'mrsistemasyservicios@gmail.com',
-  'linam0621@gmail.com'
+  'mrsistemasyservicios@gmail.com'
 ];
 // 2) Reemplaza esto con tu Client ID de Google Cloud Console (ver instrucciones).
 const GOOGLE_CLIENT_ID = '205283610798-5fg1so4k7l8409id93l4325qt2gqvhqu.apps.googleusercontent.com';
