@@ -773,6 +773,8 @@ const MAINT_KEY = 'maintenance-list';
 const MAINT_DESC_KEY = 'maint-desc-list';
 const PROPOSAL_TEMPLATE_KEY = 'proposal-template';
 const BANK_KEY = 'bank-accounts-list';
+const ITEM_IMG_PREFIX = 'item-img:';
+let itemImageCache = {};
 let bankAccountsCache = [];
 let items = [];
 let itemSeq = 0;
@@ -894,7 +896,7 @@ function handleItemImageUpload(id, file){
   const reader = new FileReader();
   reader.onload = (e) => {
     const img = new Image();
-    img.onload = () => {
+    img.onload = async () => {
       const maxW = 260;
       const scale = Math.min(1, maxW / img.width);
       const canvas = document.createElement('canvas');
@@ -902,23 +904,43 @@ function handleItemImageUpload(id, file){
       canvas.height = img.height * scale;
       const ctx = canvas.getContext('2d');
       ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-      it.image = isPng ? canvas.toDataURL('image/png') : canvas.toDataURL('image/jpeg', 0.7);
+      const dataUrl = isPng ? canvas.toDataURL('image/png') : canvas.toDataURL('image/jpeg', 0.7);
+
+      const imageId = it.imageId || ('img_' + Date.now() + Math.random().toString(36).slice(2,8));
+      it.imageId = imageId;
+      it.image = dataUrl; // solo en memoria, para mostrarla ya mismo
+      itemImageCache[imageId] = dataUrl;
       it.imgOpen = true;
       renderItems();
       renderPreview();
-      $('saveStatus').textContent = 'Imagen añadida al ítem. Recuerda guardar la cotización.';
+      $('saveStatus').textContent = 'Guardando imagen...';
+      try{
+        const res = await storageSet(ITEM_IMG_PREFIX + imageId, dataUrl, false);
+        if(!res) throw new Error('sin respuesta');
+        $('saveStatus').textContent = 'Imagen guardada. Recuerda guardar la cotización.';
+      }catch(err){
+        console.error('No se pudo guardar la imagen', err);
+        $('saveStatus').textContent = 'No se pudo guardar la imagen en el almacenamiento. Intenta de nuevo.';
+      }
     };
     img.src = e.target.result;
   };
   reader.readAsDataURL(file);
 }
 
-function removeItemImage(id){
+async function removeItemImage(id){
   const it = items.find(i=>i.id===id);
   if(!it) return;
+  const imageId = it.imageId;
   delete it.image;
+  delete it.imageId;
   renderItems();
   renderPreview();
+  if(imageId){
+    delete itemImageCache[imageId];
+    try{ await storageDelete(ITEM_IMG_PREFIX + imageId, false); }
+    catch(e){ console.error('No se pudo eliminar la imagen del almacenamiento', e); }
+  }
 }
 
 
@@ -2676,7 +2698,7 @@ async function toggleQuoteAccepted(id){
   }
 }
 
-function duplicateQuote(id){
+async function duplicateQuote(id){
   const q = quotesCache.find(x=>x.id===id);
   if(!q) return;
   setDocType(q.docType || 'cotizacion');
@@ -2695,12 +2717,17 @@ function duplicateQuote(id){
   $('notes').value = q.notes || '';
   items = (q.items||[]).map(it=>({...it}));
   itemSeq = items.length;
-  renderItems();
+  closeHistoryDrawer();
   editingExistingNumber = null;
   $('saveBtn').textContent = 'Guardar cotización';
-  closeHistoryDrawer();
+  renderItems();
   renderPreview();
   $('saveStatus').textContent = `Duplicado desde ${q.number} como una nueva cotización (${$('quoteNumber').value}). Ajusta lo que necesites y guarda.`;
+  if(items.some(it=>it.imageId)){
+    await hydrateItemImages(items);
+    renderItems();
+    renderPreview();
+  }
 }
 
 async function deleteQuoteById(id){
@@ -2716,10 +2743,36 @@ async function deleteQuoteById(id){
       $('saveBtn').textContent = 'Guardar cotización';
     }
     renderHistory();
+    if(Array.isArray(q.items)){
+      for(const it of q.items){
+        if(it.imageId){
+          delete itemImageCache[it.imageId];
+          storageDelete(ITEM_IMG_PREFIX + it.imageId, false).catch(e=>console.error('No se pudo eliminar imagen huérfana', e));
+        }
+      }
+    }
   }catch(e){ console.error('No se pudo eliminar el documento', e); }
 }
 
-function loadQuoteById(id){
+async function hydrateItemImages(itemsArr){
+  for(const it of itemsArr){
+    if(it.imageId){
+      if(itemImageCache[it.imageId]){
+        it.image = itemImageCache[it.imageId];
+        continue;
+      }
+      try{
+        const res = await storageGet(ITEM_IMG_PREFIX + it.imageId, false);
+        if(res && res.value){
+          itemImageCache[it.imageId] = res.value;
+          it.image = res.value;
+        }
+      }catch(e){ console.error('No se pudo cargar la imagen del ítem', it.imageId, e); }
+    }
+  }
+}
+
+async function loadQuoteById(id){
   const q = quotesCache.find(x=>x.id===id);
   if(!q) return;
   $('bizName').value = q.biz && q.biz.name || $('bizName').value;
@@ -2760,6 +2813,10 @@ function loadQuoteById(id){
   $('proposalOtros').value = prop.otros || '';
   items = (q.items||[]).map(it=>({...it}));
   itemSeq = items.length;
+  if(items.some(it=>it.imageId)){
+    $('saveStatus').textContent = 'Cargando imágenes de los ítems...';
+    await hydrateItemImages(items);
+  }
   renderItems();
   docType = loadedType;
   document.querySelectorAll('#docTypeToggle button').forEach(b=>{
@@ -2812,7 +2869,7 @@ async function saveCurrentQuote(){
     valid: $('quoteValid').value,
     biz: { name: $('bizName').value, id: $('bizId').value, email: $('bizEmail').value, phone: $('bizPhone').value, address: $('bizAddress').value },
     client: { name: $('clientName').value, company: $('clientCompany').value, nit: $('clientNit').value, address: $('clientAddress').value, email: $('clientEmail').value, phone: $('clientPhone').value },
-    items: items.map(i=>({...i})),
+    items: items.map(i=>{ const {image, imgOpen, ...rest} = i; return rest; }),
     taxRate: Number($('taxRate').value)||0,
     discountRate: Number($('discountRate').value)||0,
     advance: Number($('advanceAmount').value)||0,
