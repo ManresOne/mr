@@ -3002,6 +3002,14 @@ $('printBtn').addEventListener('click', ()=>{
   setTimeout(()=> window.print(), 80);
 });
 window.addEventListener('afterprint', ()=>{ document.title = APP_TITLE; });
+
+document.addEventListener('keydown', (e)=>{
+  const isSaveShortcut = (e.ctrlKey || e.metaKey) && (e.key === 's' || e.key === 'S');
+  if(!isSaveShortcut) return;
+  if(document.body.classList.contains('locked')) return; // no guardar si aún no ha iniciado sesión
+  e.preventDefault();
+  saveCurrentQuote();
+});
 $('mobilePreviewToggle').addEventListener('click', ()=>{
   const panel = $('previewPanel');
   const btn = $('mobilePreviewToggle');
