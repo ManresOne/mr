@@ -653,6 +653,74 @@
         </select>
       </label>
       <label>Equipo<input id="maintEquipment" placeholder="Ej: PC Recepción, Dell Optiplex 3080"></label>
+
+      <details class="settings-block" id="maintSpecsBlock" style="margin:4px 0;">
+        <summary>Especificaciones técnicas del equipo (opcional)</summary>
+        <div class="field-grid" style="margin-top:10px;">
+          <label>Marca
+            <select id="maintBrand">
+              <option value="">Selecciona…</option>
+              <option>Dell</option><option>HP</option><option>Lenovo</option><option>Asus</option>
+              <option>Acer</option><option>Apple</option><option>MSI</option><option>Samsung</option>
+              <option>Toshiba</option><option>Sony (Vaio)</option><option>Huawei</option><option>LG</option>
+              <option>Gigabyte</option><option>Otra</option>
+            </select>
+          </label>
+          <label id="maintBrandOtherWrap" style="display:none;">Marca (especificar)<input id="maintBrandOther" placeholder="Escribe la marca"></label>
+          <label>No. Serial<input id="maintSerial" placeholder="Número de serie"></label>
+          <label>Referencia<input id="maintReference" placeholder="Modelo / referencia"></label>
+          <label>Procesador
+            <select id="maintProcessor">
+              <option value="">Selecciona…</option>
+              <option>Intel Celeron</option><option>Intel Pentium</option>
+              <option>Intel Core i3</option><option>Intel Core i5</option><option>Intel Core i7</option><option>Intel Core i9</option>
+              <option>Intel Xeon</option>
+              <option>AMD Athlon</option><option>AMD A-Series</option>
+              <option>AMD Ryzen 3</option><option>AMD Ryzen 5</option><option>AMD Ryzen 7</option><option>AMD Ryzen 9</option>
+              <option>Apple M1/M2/M3</option><option>Otro</option>
+            </select>
+          </label>
+          <label id="maintProcessorOtherWrap" style="display:none;">Procesador (especificar)<input id="maintProcessorOther" placeholder="Escribe el procesador"></label>
+          <label>Memoria RAM
+            <select id="maintRAM">
+              <option value="">Selecciona…</option>
+              <option>2 GB</option><option>4 GB</option><option>8 GB</option>
+              <option>16 GB</option><option>32 GB</option><option>64 GB</option><option>Otra</option>
+            </select>
+          </label>
+          <label id="maintRAMOtherWrap" style="display:none;">RAM (especificar)<input id="maintRAMOther" placeholder="Ej: 12 GB"></label>
+          <label>Tipo de disco
+            <select id="maintDiskType">
+              <option value="">Selecciona…</option>
+              <option>HDD</option><option>SSD</option><option>M.2 NVMe</option>
+            </select>
+          </label>
+          <label>Capacidad del disco
+            <select id="maintDiskCapacity">
+              <option value="">Selecciona…</option>
+              <option>120 GB</option><option>240 GB</option><option>256 GB</option><option>480 GB</option>
+              <option>500 GB</option><option>1 TB</option><option>2 TB</option><option>4 TB</option><option>Otra</option>
+            </select>
+          </label>
+          <label id="maintDiskOtherWrap" style="display:none;">Capacidad (especificar)<input id="maintDiskOther" placeholder="Ej: 750 GB"></label>
+          <label>Sistema operativo
+            <select id="maintOS">
+              <option value="">Selecciona…</option>
+              <option>Windows 11</option><option>Windows 10</option><option>Windows 8/8.1</option>
+              <option>Windows 7</option><option>Linux</option><option>macOS</option><option>Otro</option>
+            </select>
+          </label>
+          <label>Versión<input id="maintOSVersion" placeholder="Ej: Pro, Home, 22H2, Ubuntu 22.04"></label>
+          <label>¿Se realizó Back Up?
+            <select id="maintBackup">
+              <option value="">Selecciona…</option>
+              <option value="si">Sí</option>
+              <option value="no">No</option>
+            </select>
+          </label>
+        </div>
+        <label style="margin-top:10px;display:block;">Observaciones<textarea id="maintObservaciones" rows="2" placeholder="Notas adicionales sobre el equipo..."></textarea></label>
+      </details>
       <div class="field-grid">
         <label>Tipo
           <select id="maintType">
@@ -1729,6 +1797,111 @@ async function deleteCatalogKit(){
     renderCatalogPicker();
     clearKitBuilder();
   }catch(e){ console.error('No se pudo eliminar el kit', e); }
+}
+
+async function buildQuotePdfBlob(){
+  const { jsPDF } = window.jspdf;
+  const pdf = new jsPDF({ orientation:'portrait', unit:'mm', format:'letter' });
+  const pageWidth = pdf.internal.pageSize.getWidth();
+  const margin = 15;
+  let y = margin;
+
+  try{ pdf.addImage(LOGO_DATA_URI, 'PNG', pageWidth-margin-30, y-4, 30, 14); }catch(e){}
+
+  const isAccount = docType === 'cuenta';
+  const docLabel = isAccount ? 'CUENTA DE COBRO' : 'COTIZACIÓN';
+  const num = $('quoteNumber').value;
+  const date = $('quoteDate').value;
+
+  pdf.setFont('helvetica','bold'); pdf.setFontSize(13);
+  pdf.text(docLabel, margin, y+2);
+  pdf.setFont('helvetica','normal'); pdf.setFontSize(9);
+  pdf.text(num + (date ? ' · ' + formatDisplayDate(date) : ''), margin, y+8);
+  y += 20;
+
+  pdf.setFont('helvetica','bold'); pdf.setFontSize(9);
+  pdf.text('DE', margin, y);
+  pdf.text('PARA', pageWidth/2, y);
+  y += 5;
+  pdf.setFont('helvetica','normal'); pdf.setFontSize(9.5);
+  const bizLines = [$('bizName').value];
+  if($('bizId').value) bizLines.push('NIT '+$('bizId').value);
+  if($('bizPhone').value) bizLines.push($('bizPhone').value);
+  const clientLines = [$('clientName').value];
+  if($('clientNit').value) clientLines.push('NIT '+$('clientNit').value);
+  if($('clientPhone').value) clientLines.push($('clientPhone').value);
+  const maxLines = Math.max(bizLines.length, clientLines.length);
+  for(let i=0;i<maxLines;i++){
+    if(bizLines[i]) pdf.text(String(bizLines[i]), margin, y);
+    if(clientLines[i]) pdf.text(String(clientLines[i]), pageWidth/2, y);
+    y += 5;
+  }
+  y += 6;
+
+  const colDesc = margin, colQty = pageWidth-72, colPrice = pageWidth-54, colTotal = pageWidth-margin;
+  pdf.setFont('helvetica','bold'); pdf.setFontSize(8.5);
+  pdf.text('DESCRIPCIÓN', colDesc, y);
+  pdf.text('CANT.', colQty, y);
+  pdf.text('PRECIO', colPrice, y);
+  pdf.text('VALOR', colTotal, y, {align:'right'});
+  y += 2;
+  pdf.setDrawColor(28,43,69); pdf.setLineWidth(0.4);
+  pdf.line(margin, y, pageWidth-margin, y);
+  y += 5;
+
+  pdf.setFont('helvetica','normal'); pdf.setFontSize(9);
+  items.forEach(it=>{
+    if(y > 255){ pdf.addPage(); y = margin; }
+    const descLines = pdf.splitTextToSize(it.desc||'', colQty-colDesc-4);
+    pdf.text(descLines, colDesc, y);
+    pdf.text(String(it.qty), colQty, y);
+    pdf.text(formatMoney(it.price), colPrice, y);
+    pdf.text(formatMoney(it.qty*it.price), colTotal, y, {align:'right'});
+    y += 5 * descLines.length;
+    pdf.setDrawColor(220,220,220); pdf.setLineWidth(0.2);
+    pdf.line(margin, y-2, pageWidth-margin, y-2);
+    y += 2;
+  });
+
+  y += 5;
+  const t = getTotals();
+  pdf.setFont('helvetica','bold'); pdf.setFontSize(12);
+  pdf.text('Total: ' + formatMoney(t.total), pageWidth-margin, y, {align:'right'});
+  y += 10;
+
+  if($('notes').value){
+    pdf.setFont('helvetica','normal'); pdf.setFontSize(8.5);
+    const noteLines = pdf.splitTextToSize($('notes').value, pageWidth-margin*2);
+    pdf.text(noteLines, margin, y);
+  }
+
+  return pdf.output('blob');
+}
+
+async function shareViaNative(){
+  if(!navigator.share){
+    $('saveStatus').textContent = 'Tu navegador no soporta compartir nativo. Usa "Exportar / imprimir PDF" y adjúntalo manualmente.';
+    return;
+  }
+  $('saveStatus').textContent = 'Generando PDF para compartir...';
+  try{
+    const blob = await buildQuotePdfBlob();
+    const filename = buildPdfFilename() + '.pdf';
+    const file = new File([blob], filename, {type:'application/pdf'});
+    const shareData = { files:[file], title: buildPdfFilename(), text: buildSummaryText() };
+    if(navigator.canShare && !navigator.canShare(shareData)){
+      await navigator.share({ title: buildPdfFilename(), text: buildSummaryText() });
+      $('saveStatus').textContent = 'Se compartió el mensaje (este navegador no admite adjuntar el PDF automáticamente).';
+      return;
+    }
+    await navigator.share(shareData);
+    $('saveStatus').textContent = 'Compartido correctamente.';
+  }catch(e){
+    if(e.name !== 'AbortError'){
+      console.error(e);
+      $('saveStatus').textContent = 'No se pudo compartir. Usa "Exportar / imprimir PDF" como alternativa.';
+    }
+  }
 }
 
 function buildSummaryText(){
@@ -3356,6 +3529,7 @@ function showClientDetail(clientId){
       </div>
       <button id="backToClientsList" class="btn btn-ghost btn-small" type="button">← Volver</button>
     </div>
+    <button id="quoteFromClientBtn" class="btn btn-primary btn-small" type="button" style="width:100%;margin:10px 0 4px;">+ Cotizar para este cliente</button>
 
     <div class="client-detail-summary">
       <div class="client-detail-card"><div class="d-label">Total pagado</div><div class="d-value">${formatMoney(totalPagado)}</div></div>
@@ -3393,6 +3567,21 @@ function showClientDetail(clientId){
   $('backToClientsList').addEventListener('click', ()=>{
     detail.style.display = 'none';
     $('clientsListView').style.display = '';
+  });
+  $('quoteFromClientBtn').addEventListener('click', ()=>{
+    closeClientsDrawer();
+    setDocType('cotizacion');
+    resetForm('cotizacion');
+    if($('clientPickerInput')) $('clientPickerInput').value = client.name;
+    $('clientName').value = client.name || '';
+    $('clientCompany').value = client.company || '';
+    $('clientNit').value = client.nit || '';
+    $('clientAddress').value = client.address || '';
+    $('clientEmail').value = client.email || '';
+    $('clientPhone').value = client.phone || '';
+    renderPreview();
+    $('saveStatus').textContent = `Nueva cotización para ${client.name}. Agrega los ítems y guarda.`;
+    document.querySelector('.form-panel').scrollIntoView({behavior:'smooth', block:'start'});
   });
   detail.querySelectorAll('[data-qid]').forEach(el=>{
     el.addEventListener('click', ()=>{
@@ -3546,6 +3735,8 @@ $('mobilePreviewToggle').addEventListener('click', ()=>{
 });
 $('whatsappBtn').addEventListener('click', sendWhatsApp);
 $('gmailBtn').addEventListener('click', sendGmail);
+$('nativeShareBtn').addEventListener('click', shareViaNative);
+if(navigator.share){ $('nativeShareBtn').style.display = ''; }
 $('newQuoteBtn').addEventListener('click', ()=>{ if(confirm('¿Empezar una cotización nueva? Se perderán los cambios sin guardar.')) resetForm(); });
 $('clientsToggle').addEventListener('click', openClientsDrawer);
 $('closeClients').addEventListener('click', closeClientsDrawer);
