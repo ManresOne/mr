@@ -646,6 +646,12 @@
       <button id="closeMaint" class="btn btn-ghost btn-small">Cerrar</button>
     </div>
 
+    <div class="hist-tabs">
+      <button class="hist-tab active" id="maintTabRecords" type="button">Registros</button>
+      <button class="hist-tab" id="maintTabReports" type="button">📋 Informes</button>
+    </div>
+
+    <div id="maintRecordsView">
     <div class="maint-form">
       <label>Cliente
         <select id="maintClient">
@@ -758,6 +764,11 @@
       </select>
     </label>
     <div id="maintList" class="history-list"><p class="history-empty">Cargando...</p></div>
+    </div>
+
+    <div id="maintReportsView" style="display:none;">
+      <div id="maintReportsList" class="history-list"><p class="history-empty">Cargando...</p></div>
+    </div>
   </aside>
   <div class="history-overlay" id="maintOverlay"></div>
 
@@ -2044,7 +2055,6 @@ function quickNextDate(months){
   base.setMonth(base.getMonth()+months);
   $('maintNextDate').value = base.toISOString().slice(0,10);
 }
-
 function clearMaintForm(){
   $('maintEquipment').value='';
   $('maintDesc').value='';
@@ -2052,6 +2062,31 @@ function clearMaintForm(){
   $('deleteMaintDescBtn').style.display='none';
   $('maintDate').value = todayISO();
   $('maintNextDate').value='';
+  $('maintBrand').value='';
+  $('maintBrandOther').value='';
+  $('maintBrandOtherWrap').style.display='none';
+  $('maintSerial').value='';
+  $('maintReference').value='';
+  $('maintProcessor').value='';
+  $('maintProcessorOther').value='';
+  $('maintProcessorOtherWrap').style.display='none';
+  $('maintRAM').value='';
+  $('maintRAMOther').value='';
+  $('maintRAMOtherWrap').style.display='none';
+  $('maintDiskType').value='';
+  $('maintDiskCapacity').value='';
+  $('maintDiskOther').value='';
+  $('maintDiskOtherWrap').style.display='none';
+  $('maintOS').value='';
+  $('maintOSVersion').value='';
+  $('maintBackup').value='';
+  $('maintObservaciones').value='';
+}
+
+function resolveMaintSelectValue(selectId, otherId, otherLabel){
+  const val = $(selectId).value;
+  if(val === otherLabel) return ($(otherId).value || '').trim();
+  return val;
 }
 
 async function saveMaintenance(){
@@ -2066,6 +2101,19 @@ async function saveMaintenance(){
     $('maintStatus').textContent = 'Escribe a qué equipo se le hizo el mantenimiento.';
     return;
   }
+  const specs = {
+    brand: resolveMaintSelectValue('maintBrand','maintBrandOther','Otra'),
+    serial: $('maintSerial').value.trim(),
+    reference: $('maintReference').value.trim(),
+    processor: resolveMaintSelectValue('maintProcessor','maintProcessorOther','Otro'),
+    ram: resolveMaintSelectValue('maintRAM','maintRAMOther','Otra'),
+    diskType: $('maintDiskType').value,
+    diskCapacity: resolveMaintSelectValue('maintDiskCapacity','maintDiskOther','Otra'),
+    os: $('maintOS').value,
+    osVersion: $('maintOSVersion').value.trim(),
+    backup: $('maintBackup').value,
+    observaciones: $('maintObservaciones').value.trim()
+  };
   const record = {
     id: 'mt'+Date.now(),
     clientId: client.id,
@@ -2075,6 +2123,7 @@ async function saveMaintenance(){
     date: $('maintDate').value || todayISO(),
     nextDate: $('maintNextDate').value,
     desc: $('maintDesc').value,
+    specs,
     createdAt: Date.now()
   };
   $('maintStatus').textContent = 'Guardando...';
@@ -2201,7 +2250,55 @@ function openMaintDrawer(){
   $('maintOverlay').classList.add('open');
   refreshMaintClientSelects();
   if(!$('maintDate').value) $('maintDate').value = todayISO();
+  switchMaintTab('records');
   renderMaintList();
+}
+
+function switchMaintTab(tab){
+  const isRecords = tab === 'records';
+  $('maintTabRecords').classList.toggle('active', isRecords);
+  $('maintTabReports').classList.toggle('active', !isRecords);
+  $('maintRecordsView').style.display = isRecords ? '' : 'none';
+  $('maintReportsView').style.display = isRecords ? 'none' : '';
+  if(!isRecords) renderMaintReportsList();
+}
+
+function maintHasReportContent(m){
+  const r = m.report;
+  if(!r) return false;
+  const hasHallazgos = (r.hallazgos||[]).some(h=>(h.title||'').trim() || (h.notes||'').trim());
+  return hasHallazgos || !!(r.conclusion||'').trim();
+}
+
+function renderMaintReportsList(){
+  const list = $('maintReportsList');
+  const records = maintenanceCache.filter(maintHasReportContent)
+    .sort((a,b)=> (b.date||'').localeCompare(a.date||''));
+
+  if(records.length===0){
+    list.innerHTML = '<p class="history-empty">No hay informes de hallazgos guardados todavía.</p>';
+    return;
+  }
+  list.innerHTML = records.map(m => {
+    const count = (m.report.hallazgos||[]).filter(h=>(h.title||'').trim() || (h.notes||'').trim()).length;
+    return `
+    <div class="maint-item" data-id="${m.id}">
+      <div class="h-client">${escapeHtml(m.clientName)}</div>
+      <div class="maint-equipment">${escapeHtml(m.equipment)}</div>
+      <div class="h-meta">Fecha: ${m.date ? formatDisplayDate(m.date) : '—'}</div>
+      <div class="h-meta">${count} hallazgo${count===1?'':'s'} registrado${count===1?'':'s'}</div>
+      <div class="maint-reminder-row">
+        <button class="btn btn-small btn-ghost maint-view-report" type="button">📋 Ver / editar informe</button>
+      </div>
+    </div>`;
+  }).join('');
+
+  list.querySelectorAll('.maint-view-report').forEach(btn=>{
+    btn.addEventListener('click', e=>{
+      const id = e.target.closest('.maint-item').dataset.id;
+      openFindingsModal(id);
+    });
+  });
 }
 function closeMaintDrawer(){
   $('maintDrawer').classList.remove('open');
@@ -3756,6 +3853,17 @@ $('saveMaintBtn').addEventListener('click', saveMaintenance);
 $('maintPlus4').addEventListener('click', ()=>quickNextDate(4));
 $('maintPlus6').addEventListener('click', ()=>quickNextDate(6));
 $('maintFilterClient').addEventListener('change', renderMaintList);
+function setupMaintOtherToggle(selectId, wrapId, otherLabel){
+  $(selectId).addEventListener('change', ()=>{
+    $(wrapId).style.display = $(selectId).value === otherLabel ? '' : 'none';
+  });
+}
+setupMaintOtherToggle('maintBrand', 'maintBrandOtherWrap', 'Otra');
+setupMaintOtherToggle('maintProcessor', 'maintProcessorOtherWrap', 'Otro');
+setupMaintOtherToggle('maintRAM', 'maintRAMOtherWrap', 'Otra');
+setupMaintOtherToggle('maintDiskCapacity', 'maintDiskOtherWrap', 'Otra');
+$('maintTabRecords').addEventListener('click', ()=>switchMaintTab('records'));
+$('maintTabReports').addEventListener('click', ()=>switchMaintTab('reports'));
 $('dashToggle').addEventListener('click', openDashboard);
 $('closeDash').addEventListener('click', closeDashboard);
 $('closeFindings').addEventListener('click', closeFindingsModal);
