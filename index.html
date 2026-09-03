@@ -4,6 +4,14 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Cotizador — Sistemas y Servicios</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#1C2B45">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Cotizador MR">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,500;0,9..144,600;1,9..144,500&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
@@ -802,7 +810,11 @@
       <p class="client-detail-section-title" style="margin-top:20px;">Hallazgos</p>
       <div id="findingsListBuilder"></div>
       <button id="addFindingBtn" class="btn btn-small btn-ghost" type="button">+ Añadir hallazgo</button>
-      <label style="margin-top:16px;display:block;">Conclusión técnica<textarea id="findConclusion" rows="4" placeholder="Resumen del nivel de riesgo/estado general y recomendación de plazo para actuar..."></textarea></label>
+      <label style="margin-top:16px;display:block;">Conclusión técnica
+        <button id="aiConclusionBtn" class="btn btn-small btn-ghost" type="button" style="margin-left:8px;">🤖 Generar con IA</button>
+        <textarea id="findConclusion" rows="4" placeholder="Resumen del nivel de riesgo/estado general y recomendación de plazo para actuar..."></textarea>
+      </label>
+      <p id="aiConclusionStatus" class="history-empty" style="display:none;margin-top:6px;"></p>
     </div>
   </div>
 
@@ -2508,6 +2520,44 @@ function addFinding(){
   renderFindingsBuilder();
 }
 
+async function generateConclusionWithAI(){
+  const btn = $('aiConclusionBtn');
+  const status = $('aiConclusionStatus');
+  status.style.display = '';
+
+  if(!getSyncUrl()){
+    status.textContent = 'Esta función necesita tu Google Sheet conectada (URL de sincronización en Ajustes), porque la IA se llama desde tu Apps Script.';
+    return;
+  }
+  const hallazgosConContenido = currentFindings.filter(h => (h.title||'').trim() || (h.notes||'').trim());
+  if(hallazgosConContenido.length === 0){
+    status.textContent = 'Agrega al menos un hallazgo antes de generar la conclusión.';
+    return;
+  }
+
+  btn.disabled = true;
+  btn.textContent = '⏳ Generando...';
+  status.textContent = 'Consultando IA, un momento...';
+
+  try{
+    const data = await cloudRequest({
+      action: 'ai_conclusion',
+      clientName: $('findClientName').value,
+      equipment: $('findEquipment').value,
+      hallazgos: hallazgosConContenido
+    });
+    $('findConclusion').value = data.conclusion || '';
+    status.textContent = 'Conclusión generada. Revísala y ajústala si hace falta antes de guardar.';
+    await saveFindingsDraft();
+  }catch(e){
+    console.error(e);
+    status.textContent = 'No se pudo generar la conclusión. Revisa que tu Apps Script tenga configurada la acción "ai_conclusion" y la llave de IA.';
+  }finally{
+    btn.disabled = false;
+    btn.textContent = '🤖 Generar con IA';
+  }
+}
+
 async function saveFindingsDraft(){
   if(!currentMaintForReport) return;
   currentMaintForReport.report = {
@@ -3836,6 +3886,7 @@ $('addFindingBtn').addEventListener('click', addFinding);
 $('exportFindingsBtn').addEventListener('click', exportFindingsPDF);
 $('findPersonaCargo').addEventListener('blur', saveFindingsDraft);
 $('findConclusion').addEventListener('blur', saveFindingsDraft);
+$('aiConclusionBtn').addEventListener('click', generateConclusionWithAI);
 $('findDate').addEventListener('change', saveFindingsDraft);
 $('exportDashExcelBtn').addEventListener('click', exportDashboardExcel);
 $('exportDashPdfBtn').addEventListener('click', exportDashboardPDF);
@@ -3989,6 +4040,12 @@ $('logoutBtn').addEventListener('click', lockApp);
   await loadProposalTemplate();
   resetForm('cotizacion');
 })();
+
+if('serviceWorker' in navigator){
+  window.addEventListener('load', ()=>{
+    navigator.serviceWorker.register('sw.js').catch(err=>console.error('No se pudo registrar el service worker', err));
+  });
+}
 </script>
 </body>
 </html>
