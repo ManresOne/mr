@@ -10,6 +10,7 @@
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.5.0/chart.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <style>
   :root{
     --paper:#ECEBE4;
@@ -1811,79 +1812,43 @@ async function deleteCatalogKit(){
 }
 
 async function buildQuotePdfBlob(){
+  renderPreview();
+  const node = $('previewPanel');
+
+  // En móvil el panel de vista previa está oculto por defecto: lo mostramos
+  // temporalmente para poder capturarlo con la marca completa.
+  const wasHidden = getComputedStyle(node).display === 'none';
+  if(wasHidden) node.classList.add('mobile-show');
+
+  let canvas;
+  try{
+    canvas = await html2canvas(node, {
+      scale: 2,
+      useCORS: true,
+      backgroundColor: '#ffffff'
+    });
+  } finally {
+    if(wasHidden) node.classList.remove('mobile-show');
+  }
+
   const { jsPDF } = window.jspdf;
   const pdf = new jsPDF({ orientation:'portrait', unit:'mm', format:'letter' });
   const pageWidth = pdf.internal.pageSize.getWidth();
-  const margin = 15;
-  let y = margin;
+  const pageHeight = pdf.internal.pageSize.getHeight();
+  const imgWidth = pageWidth;
+  const imgHeight = canvas.height * imgWidth / canvas.width;
+  const imgData = canvas.toDataURL('image/jpeg', 0.95);
 
-  try{ pdf.addImage(LOGO_DATA_URI, 'PNG', pageWidth-margin-30, y-4, 30, 14); }catch(e){}
+  let heightLeft = imgHeight;
+  let position = 0;
+  pdf.addImage(imgData, 'JPEG', 0, position, imgWidth, imgHeight);
+  heightLeft -= pageHeight;
 
-  const isAccount = docType === 'cuenta';
-  const docLabel = isAccount ? 'CUENTA DE COBRO' : 'COTIZACIÓN';
-  const num = $('quoteNumber').value;
-  const date = $('quoteDate').value;
-
-  pdf.setFont('helvetica','bold'); pdf.setFontSize(13);
-  pdf.text(docLabel, margin, y+2);
-  pdf.setFont('helvetica','normal'); pdf.setFontSize(9);
-  pdf.text(num + (date ? ' · ' + formatDisplayDate(date) : ''), margin, y+8);
-  y += 20;
-
-  pdf.setFont('helvetica','bold'); pdf.setFontSize(9);
-  pdf.text('DE', margin, y);
-  pdf.text('PARA', pageWidth/2, y);
-  y += 5;
-  pdf.setFont('helvetica','normal'); pdf.setFontSize(9.5);
-  const bizLines = [$('bizName').value];
-  if($('bizId').value) bizLines.push('NIT '+$('bizId').value);
-  if($('bizPhone').value) bizLines.push($('bizPhone').value);
-  const clientLines = [$('clientName').value];
-  if($('clientNit').value) clientLines.push('NIT '+$('clientNit').value);
-  if($('clientPhone').value) clientLines.push($('clientPhone').value);
-  const maxLines = Math.max(bizLines.length, clientLines.length);
-  for(let i=0;i<maxLines;i++){
-    if(bizLines[i]) pdf.text(String(bizLines[i]), margin, y);
-    if(clientLines[i]) pdf.text(String(clientLines[i]), pageWidth/2, y);
-    y += 5;
-  }
-  y += 6;
-
-  const colDesc = margin, colQty = pageWidth-72, colPrice = pageWidth-54, colTotal = pageWidth-margin;
-  pdf.setFont('helvetica','bold'); pdf.setFontSize(8.5);
-  pdf.text('DESCRIPCIÓN', colDesc, y);
-  pdf.text('CANT.', colQty, y);
-  pdf.text('PRECIO', colPrice, y);
-  pdf.text('VALOR', colTotal, y, {align:'right'});
-  y += 2;
-  pdf.setDrawColor(28,43,69); pdf.setLineWidth(0.4);
-  pdf.line(margin, y, pageWidth-margin, y);
-  y += 5;
-
-  pdf.setFont('helvetica','normal'); pdf.setFontSize(9);
-  items.forEach(it=>{
-    if(y > 255){ pdf.addPage(); y = margin; }
-    const descLines = pdf.splitTextToSize(it.desc||'', colQty-colDesc-4);
-    pdf.text(descLines, colDesc, y);
-    pdf.text(String(it.qty), colQty, y);
-    pdf.text(formatMoney(it.price), colPrice, y);
-    pdf.text(formatMoney(it.qty*it.price), colTotal, y, {align:'right'});
-    y += 5 * descLines.length;
-    pdf.setDrawColor(220,220,220); pdf.setLineWidth(0.2);
-    pdf.line(margin, y-2, pageWidth-margin, y-2);
-    y += 2;
-  });
-
-  y += 5;
-  const t = getTotals();
-  pdf.setFont('helvetica','bold'); pdf.setFontSize(12);
-  pdf.text('Total: ' + formatMoney(t.total), pageWidth-margin, y, {align:'right'});
-  y += 10;
-
-  if($('notes').value){
-    pdf.setFont('helvetica','normal'); pdf.setFontSize(8.5);
-    const noteLines = pdf.splitTextToSize($('notes').value, pageWidth-margin*2);
-    pdf.text(noteLines, margin, y);
+  while(heightLeft > 0){
+    position = heightLeft - imgHeight;
+    pdf.addPage();
+    pdf.addImage(imgData, 'JPEG', 0, position, imgWidth, imgHeight);
+    heightLeft -= pageHeight;
   }
 
   return pdf.output('blob');
