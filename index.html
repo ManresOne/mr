@@ -437,6 +437,48 @@
     background:#fff;
     color:var(--ui-ink);
   }
+
+  /* =========================================================
+     REDISEÑO — FASE 2: resto de la app (formularios, historial,
+     dashboard, mantenimientos, catálogo, informes de hallazgos).
+     Se reemplaza el dorado/verde azulado por escala de grises.
+     Los documentos (.doc-*, .prop-*, .party-label, etc. y el
+     color de "saldo pendiente" en la cuenta de cobro) NO se
+     tocan aquí: siguen usando --brass/--teal como siempre.
+  ========================================================= */
+  .mobile-preview-toggle.showing{ background:var(--ui-ink); }
+  input:focus,textarea:focus,select:focus{ border-color:var(--ui-ink); }
+  .catalog-mode-btn.active{ border-bottom-color:var(--ui-ink); }
+  .client-detail-section-title{ color:var(--ui-soft); }
+  .finding-num{ color:var(--ui-soft); }
+  .searchable-dropdown{ border-color:var(--ui-ink); }
+  .settings-block[open]{ border-left-color:var(--ui-ink); }
+  .calc-toggle{ color:var(--ui-ink); }
+  .calc-toggle.active{ background:var(--ui-ink); border-color:var(--ui-ink); }
+  .img-toggle{ color:var(--ui-ink); }
+  .img-toggle.active,.img-toggle.has-image{ background:var(--ui-ink); border-color:var(--ui-ink); }
+  .toggle-row input{ accent-color:var(--ui-ink); }
+  .save-status{ color:var(--ui-soft); }
+  .type-badge{ background:var(--ui-line); color:var(--ui-ink); }
+  .history-item:hover{ border-color:var(--ui-ink); box-shadow:0 2px 8px rgba(20,20,20,0.12); }
+  .history-item .h-num{ color:var(--ui-ink); }
+  .hist-dup:hover{ border-color:var(--ui-ink); color:var(--ui-ink); }
+  .status-badge.status-accepted{ background:var(--ui-ink); }
+  .hist-tab.active{ color:var(--ui-ink); border-bottom-color:var(--ui-ink); }
+  .billed-status.paid{ background:var(--ui-ink); }
+  .dash-card:hover{ border-color:var(--ui-ink); box-shadow:0 3px 10px rgba(20,20,20,0.12); }
+  .dash-card.active{ border-color:var(--ui-ink); }
+  .dash-card.accent .d-value{ color:var(--ui-ink); }
+  .dash-card.warn .d-value{ color:var(--ui-ink); }
+  .maint-type-preventivo{ background:var(--ui-soft); }
+  .maint-type-predictivo{ background:var(--ui-ink); }
+  .maint-item.maint-soon .maint-next{ color:var(--ui-ink); }
+
+  /* Íconos de línea (los de cada sección desplegable, catálogo, etc.)
+     traían el trazo dorado puesto directo en el SVG: lo forzamos a
+     gris oscuro desde CSS, sin tener que editar cada ícono a mano. */
+  .sec-icon{ stroke:var(--ui-ink); }
+  .login-gate-badge svg{ stroke:var(--ui-ink); }
 </style>
 </head>
 <body class="locked">
@@ -2495,7 +2537,7 @@ function showDashDetail(kind){
   wrap.scrollIntoView({ behavior:'smooth', block:'nearest' });
 }
 
-const CHART_COLORS = { ink:'#1C2B45', brass:'#A9834F', teal:'#3F6259', danger:'#B4553F', line:'#D7D4C8', inkSoft:'#5B6B84' };
+const CHART_COLORS = { ink:'#1C2B45', brass:'#6B6B68', teal:'#2E2E2E', danger:'#B4553F', line:'#D7D4C8', inkSoft:'#5B6B84' };
 
 function renderDashCharts(data){
   if(typeof Chart === 'undefined'){
