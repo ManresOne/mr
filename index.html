@@ -739,7 +739,11 @@
           <option value="">Selecciona un cliente…</option>
         </select>
       </label>
-      <label>Equipo<input id="maintEquipment" placeholder="Ej: PC Recepción, Dell Optiplex 3080"></label>
+      <label>Equipo
+        <input id="maintEquipment" list="maintEquipmentList" placeholder="Ej: PC Recepción, Dell Optiplex 3080" autocomplete="off">
+        <datalist id="maintEquipmentList"></datalist>
+      </label>
+      <p class="field-hint" id="maintEquipmentHint" style="display:none;margin:-4px 0 0;">Escribe igual que la vez anterior para que se autocompleten las especificaciones del equipo.</p>
 
       <details class="settings-block" id="maintSpecsBlock" style="margin:4px 0;">
         <summary>Especificaciones técnicas del equipo (opcional)</summary>
@@ -2105,6 +2109,99 @@ function refreshMaintClientSelects(){
   $('maintFilterClient').value = currentFilter;
 }
 
+// Sugiere en el campo "Equipo" los equipos que ya se le han registrado a este
+// cliente, para que al escribir un mantenimiento nuevo del mismo PC uses
+// siempre el mismo nombre (así el historial queda agrupado correctamente).
+function refreshMaintEquipmentOptions(clientId){
+  const datalist = $('maintEquipmentList');
+  const hint = $('maintEquipmentHint');
+  if(!clientId){
+    datalist.innerHTML = '';
+    hint.style.display = 'none';
+    return;
+  }
+  const seen = new Set();
+  const names = [];
+  [...maintenanceCache]
+    .filter(m => m.clientId === clientId)
+    .sort((a,b)=> (b.date||'').localeCompare(a.date||''))
+    .forEach(m=>{
+      const key = (m.equipment||'').trim();
+      if(key && !seen.has(key.toLowerCase())){
+        seen.add(key.toLowerCase());
+        names.push(key);
+      }
+    });
+  datalist.innerHTML = names.map(n => `<option value="${escapeAttr(n)}"></option>`).join('');
+  hint.style.display = names.length ? '' : 'none';
+}
+
+// Busca, para un cliente y nombre de equipo dados, el mantenimiento más
+// reciente registrado (comparación sin distinguir mayúsculas/espacios).
+function findLatestMaintForEquipment(clientId, equipmentName){
+  const norm = (equipmentName||'').trim().toLowerCase();
+  if(!clientId || !norm) return null;
+  const matches = maintenanceCache.filter(m => m.clientId === clientId && (m.equipment||'').trim().toLowerCase() === norm);
+  if(matches.length === 0) return null;
+  matches.sort((a,b)=> (b.date||'').localeCompare(a.date||'') || (b.createdAt||0)-(a.createdAt||0));
+  return matches[0];
+}
+
+// Aplica un valor a un <select> con opción "Otra/Otro": si el valor coincide
+// con una opción existente la selecciona, si no, activa el modo "especificar".
+function applyMaintSelectOrOther(selectId, wrapId, otherId, otherLabel, value){
+  const select = $(selectId);
+  const wrap = $(wrapId);
+  const otherInput = $(otherId);
+  if(!value){
+    select.value = '';
+    wrap.style.display = 'none';
+    otherInput.value = '';
+    return;
+  }
+  const hasOption = Array.from(select.options).some(o => o.value === value);
+  if(hasOption){
+    select.value = value;
+    wrap.style.display = 'none';
+    otherInput.value = '';
+  }else{
+    select.value = otherLabel;
+    wrap.style.display = '';
+    otherInput.value = value;
+  }
+}
+
+function maintSpecsFieldsAreEmpty(){
+  return !$('maintBrand').value && !$('maintSerial').value.trim() && !$('maintReference').value.trim() &&
+    !$('maintProcessor').value && !$('maintRAM').value && !$('maintDiskType').value && !$('maintDiskCapacity').value &&
+    !$('maintOS').value && !$('maintOSVersion').value.trim() && !$('maintBackup').value && !$('maintObservaciones').value.trim();
+}
+
+// Si el equipo escrito coincide con uno ya registrado a este cliente, rellena
+// las especificaciones técnicas con las del último mantenimiento de ese
+// equipo, para no volver a teclearlas si no han cambiado.
+function tryAutofillMaintEquipmentSpecs(){
+  const clientId = $('maintClient').value;
+  const equipment = $('maintEquipment').value;
+  if(!clientId || !equipment.trim()) return;
+  const match = findLatestMaintForEquipment(clientId, equipment);
+  if(!match || !maintSpecsFieldsAreEmpty()) return;
+  const specs = match.specs || {};
+  applyMaintSelectOrOther('maintBrand','maintBrandOtherWrap','maintBrandOther','Otra', specs.brand||'');
+  $('maintSerial').value = specs.serial || '';
+  $('maintReference').value = specs.reference || '';
+  applyMaintSelectOrOther('maintProcessor','maintProcessorOtherWrap','maintProcessorOther','Otro', specs.processor||'');
+  applyMaintSelectOrOther('maintRAM','maintRAMOtherWrap','maintRAMOther','Otra', specs.ram||'');
+  $('maintDiskType').value = (specs.diskType && Array.from($('maintDiskType').options).some(o=>o.value===specs.diskType)) ? specs.diskType : '';
+  applyMaintSelectOrOther('maintDiskCapacity','maintDiskOtherWrap','maintDiskOther','Otra', specs.diskCapacity||'');
+  $('maintOS').value = (specs.os && Array.from($('maintOS').options).some(o=>o.value===specs.os)) ? specs.os : '';
+  $('maintOSVersion').value = specs.osVersion || '';
+  $('maintBackup').value = specs.backup || '';
+  $('maintObservaciones').value = specs.observaciones || '';
+  $('maintSpecsBlock').open = true;
+  $('maintStatus').textContent = `Se autocompletaron las especificaciones del último mantenimiento de "${match.equipment}". Verifica y actualiza si algo cambió.`;
+}
+
 function quickNextDate(months){
   const base = $('maintDate').value ? new Date($('maintDate').value+'T00:00:00') : new Date();
   base.setMonth(base.getMonth()+months);
@@ -2188,6 +2285,7 @@ async function saveMaintenance(){
     if(!res) throw new Error('sin respuesta');
     renderMaintList();
     updateMaintBadge();
+    refreshMaintEquipmentOptions(client.id);
     clearMaintForm();
     $('maintStatus').textContent = 'Mantenimiento registrado.';
   }catch(e){
@@ -2394,6 +2492,7 @@ function openMaintDrawer(){
   $('maintDrawer').classList.add('open');
   $('maintOverlay').classList.add('open');
   refreshMaintClientSelects();
+  refreshMaintEquipmentOptions($('maintClient').value);
   if(!$('maintDate').value) $('maintDate').value = todayISO();
   switchMaintTab('records');
   renderMaintList();
@@ -4065,6 +4164,8 @@ $('saveMaintBtn').addEventListener('click', saveMaintenance);
 $('maintPlus4').addEventListener('click', ()=>quickNextDate(4));
 $('maintPlus6').addEventListener('click', ()=>quickNextDate(6));
 $('maintFilterClient').addEventListener('change', renderMaintList);
+$('maintClient').addEventListener('change', ()=> refreshMaintEquipmentOptions($('maintClient').value));
+$('maintEquipment').addEventListener('change', tryAutofillMaintEquipmentSpecs);
 function setupMaintOtherToggle(selectId, wrapId, otherLabel){
   $(selectId).addEventListener('change', ()=>{
     $(wrapId).style.display = $(selectId).value === otherLabel ? '' : 'none';
