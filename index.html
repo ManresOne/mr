@@ -13,7 +13,7 @@
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,500;0,9..144,600;1,9..144,500&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,500;0,9..144,600;1,9..144,500&family=Baloo+2:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.5.0/chart.umd.min.js"></script>
@@ -354,6 +354,88 @@
     .doc-table{break-inside:avoid-page;}
     .doc-table tr{break-inside:avoid;break-after:auto;}
     .doc-table thead{display:table-header-group;}
+  }
+
+  /* =========================================================
+     REDISEÑO — FASE 1: acceso (login) y navegación principal
+     Usa variables nuevas (--ui-*) para no tocar los colores
+     de los documentos (cotizaciones/cuentas/informes), que
+     siguen usando --ink/--brass/--paper como siempre.
+  ========================================================= */
+  :root{
+    --ui-ink:#141414;
+    --ui-soft:#6B6B68;
+    --ui-paper:#F3F3F1;
+    --ui-card:#FFFFFF;
+    --ui-line:#DCDCD8;
+  }
+
+  /* --- Login --- */
+  body.locked .login-gate{
+    background:linear-gradient(rgba(20,20,20,0.88), rgba(20,20,20,0.88)), var(--paper);
+  }
+  .login-gate-box{
+    background:var(--ui-card);
+    border:none;
+    border-radius:28px;
+    box-shadow:0 24px 60px rgba(0,0,0,0.45);
+    padding:38px 34px 30px;
+  }
+  .login-gate-badge{
+    background:var(--ui-paper);
+    border:1.5px solid var(--ui-line);
+  }
+  .login-gate-box h2{
+    font-family:'Baloo 2',sans-serif;
+    font-weight:700;
+    color:var(--ui-ink);
+  }
+  .login-gate-box p{ color:var(--ui-soft); }
+  .login-gate-error{ color:#B4553F; }
+  .login-gate-footer{
+    color:var(--ui-soft);
+    border-top:1px dashed var(--ui-line);
+  }
+
+  /* --- Encabezado / navegación principal --- */
+  .app-header{
+    background:var(--ui-ink);
+    color:#fff;
+    border-radius:24px;
+    padding:20px 24px;
+    margin-bottom:24px;
+  }
+  .app-header .brand-mark{
+    background:#fff;
+    border-radius:50%;
+    padding:5px;
+  }
+  .app-header .brand h1{
+    font-family:'Baloo 2',sans-serif;
+    font-weight:700;
+    color:#fff;
+  }
+  .app-header .tagline{ color:#B7B7B5; }
+
+  .header-actions .btn{
+    font-family:'Baloo 2',sans-serif;
+    font-weight:600;
+    border-radius:20px;
+  }
+  .header-actions .btn-ghost{
+    background:rgba(255,255,255,0.08);
+    border:1.5px solid rgba(255,255,255,0.22);
+    color:#fff;
+  }
+  .header-actions .btn-ghost:hover{ background:rgba(255,255,255,0.16); }
+  .header-actions .btn-icon{
+    /* Fuerza cualquier ícono (svg o png) a verse blanco sobre el
+       encabezado oscuro, sin tener que recolorear cada uno. */
+    filter:brightness(0) invert(1);
+  }
+  .header-actions .badge{
+    background:#fff;
+    color:var(--ui-ink);
   }
 </style>
 </head>
