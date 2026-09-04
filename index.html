@@ -94,6 +94,9 @@
     .preview-panel{display:none;}
     .preview-panel.mobile-show{display:block;}
     .mobile-preview-toggle{display:flex;}
+    .header-actions{flex-wrap:wrap;justify-content:center;}
+    .app-header{justify-content:center;text-align:center;}
+    .app-header .brand{justify-content:center;}
   }
   .mobile-preview-toggle{display:none;position:fixed;bottom:18px;left:50%;transform:translateX(-50%);z-index:15;align-items:center;gap:8px;background:var(--ink);color:var(--paper);border:none;border-radius:24px;padding:12px 22px;font-family:'IBM Plex Sans',sans-serif;font-size:13px;font-weight:600;cursor:pointer;box-shadow:0 4px 16px rgba(28,43,69,0.35);}
   .mobile-preview-toggle.showing{background:var(--brass);}
@@ -479,6 +482,41 @@
      gris oscuro desde CSS, sin tener que editar cada ícono a mano. */
   .sec-icon{ stroke:var(--ui-ink); }
   .login-gate-badge svg{ stroke:var(--ui-ink); }
+
+  /* =========================================================
+     REDISEÑO — FASE 3: unificar TODOS los botones de acción
+     (cotización/cuenta de cobro, conectar, respaldo, guardar,
+     importar/exportar, añadir ítem, imprimir/PDF, WhatsApp,
+     Gmail, compartir, etc.) con el mismo lenguaje redondeado
+     y oscuro del cabezote. Los documentos no tienen botones,
+     así que esto no los afecta.
+  ========================================================= */
+  .btn{
+    font-family:'Baloo 2',sans-serif;
+    font-weight:600;
+    border-radius:20px;
+  }
+  .btn-small{ border-radius:14px; }
+  .btn-primary{ background:var(--ui-ink); color:#fff; border-color:var(--ui-ink); }
+  .btn-outline{ background:transparent; border:1.5px solid var(--ui-ink); color:var(--ui-ink); }
+  .btn-ghost{ background:#fff; border:1.5px solid var(--ui-line); color:var(--ui-ink); }
+  .btn-ghost:hover{ border-color:var(--ui-ink); }
+  .btn-text{ color:var(--ui-soft); }
+
+  .doc-type-toggle{ border-radius:22px; border-color:var(--ui-line); }
+  .doc-type-toggle button{ color:var(--ui-soft); }
+  .doc-type-toggle button.active{ background:var(--ui-ink); color:#fff; }
+
+  /* Los botones del cabezote (fondo oscuro) mantienen su propio
+     estilo translúcido en vez del sólido, para verse bien sobre
+     ese fondo — se redefine después de las reglas generales de
+     arriba para que gane en la cascada. */
+  .header-actions .btn-ghost{
+    background:rgba(255,255,255,0.08);
+    border:1.5px solid rgba(255,255,255,0.22);
+    color:#fff;
+  }
+  .header-actions .btn-ghost:hover{ background:rgba(255,255,255,0.16); border-color:rgba(255,255,255,0.4); }
 </style>
 </head>
 <body class="locked">
@@ -2537,7 +2575,7 @@ function showDashDetail(kind){
   wrap.scrollIntoView({ behavior:'smooth', block:'nearest' });
 }
 
-const CHART_COLORS = { ink:'#1C2B45', brass:'#6B6B68', teal:'#2E2E2E', danger:'#B4553F', line:'#D7D4C8', inkSoft:'#5B6B84' };
+const CHART_COLORS = { ink:'#1C2B45', brass:'#C9973E', teal:'#3F8E7A', danger:'#C1503A', line:'#D7D4C8', inkSoft:'#5B6B84' };
 
 function renderDashCharts(data){
   if(typeof Chart === 'undefined'){
