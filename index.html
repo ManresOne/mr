@@ -327,6 +327,43 @@
   .maint-reminder-row{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;padding-top:8px;border-top:1px dashed var(--line);}
   .maint-reminder-row .btn{font-size:11px;padding:5px 9px;}
 
+  /* Acordeón de mantenimientos agrupado por cliente */
+  .maint-accordion{display:flex;flex-direction:column;gap:10px;}
+  .maint-client-acc{border:1px solid var(--line);border-radius:8px;overflow:hidden;background:#FBFAF7;}
+  .maint-client-acc-header{display:flex;align-items:center;justify-content:space-between;width:100%;padding:11px 13px;background:var(--panel);border:none;border-bottom:1px solid transparent;cursor:pointer;font-family:'Baloo 2',sans-serif;font-weight:600;font-size:13px;color:var(--ink);text-align:left;gap:8px;}
+  .maint-client-acc-header:hover{background:#F3F1EA;}
+  .maint-client-acc.open .maint-client-acc-header{border-bottom-color:var(--line);}
+  .maint-client-acc-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .maint-client-acc-right{display:flex;align-items:center;gap:8px;flex-shrink:0;}
+  .maint-client-acc-count{font-size:11px;color:var(--ink-soft);font-weight:500;font-family:'IBM Plex Sans',sans-serif;white-space:nowrap;}
+  .maint-client-acc-chevron{font-size:11px;color:var(--brass);transition:transform .15s ease;display:inline-block;}
+  .maint-client-acc.open .maint-client-acc-chevron{transform:rotate(180deg);}
+  .maint-client-acc-body{display:none;flex-direction:column;gap:8px;padding:10px;}
+  .maint-client-acc.open .maint-client-acc-body{display:flex;}
+
+  .maint-record-card{border:1px solid var(--line);border-radius:6px;background:#fff;overflow:hidden;}
+  .maint-record-card.maint-overdue{border-color:var(--danger);}
+  .maint-record-summary{display:flex;align-items:flex-start;justify-content:space-between;gap:8px;padding:9px 11px;cursor:pointer;}
+  .maint-record-summary:hover{background:#F7F6F1;}
+  .maint-record-summary-left{display:flex;flex-direction:column;gap:3px;min-width:0;}
+  .maint-record-equipment{font-weight:600;font-size:12.5px;color:var(--ink);word-break:break-word;}
+  .maint-record-meta{font-size:11px;color:var(--ink-soft);display:flex;align-items:center;gap:6px;flex-wrap:wrap;}
+  .maint-record-meta .maint-next-tag{font-weight:600;}
+  .maint-record-card.maint-soon .maint-record-meta .maint-next-tag{color:var(--ink);}
+  .maint-record-card.maint-overdue .maint-record-meta .maint-next-tag{color:var(--danger);}
+  .maint-record-actions{display:flex;gap:4px;flex-shrink:0;}
+  .maint-record-actions button{background:none;border:none;cursor:pointer;font-size:14px;padding:2px 4px;color:var(--ink-soft);border-radius:4px;}
+  .maint-record-actions button:hover{background:var(--paper);}
+  .maint-record-chevron{font-size:10px;color:var(--ink-soft);margin-left:2px;transition:transform .15s ease;flex-shrink:0;align-self:center;}
+  .maint-record-card.open .maint-record-chevron{transform:rotate(180deg);}
+  .maint-record-details{display:none;padding:0 11px 11px;border-top:1px dashed var(--line);margin-top:2px;}
+  .maint-record-card.open .maint-record-details{display:block;}
+  .maint-specs-title{font-size:11px;color:var(--ink-soft);text-transform:uppercase;letter-spacing:0.5px;margin:10px 0 4px;}
+  .maint-specs-table{width:100%;border-collapse:collapse;font-size:12px;}
+  .maint-specs-table td{padding:4px 4px;border-bottom:1px solid var(--line);vertical-align:top;}
+  .maint-specs-table td:first-child{color:var(--ink-soft);width:42%;padding-right:8px;}
+  .maint-specs-empty{font-size:11.5px;color:var(--ink-soft);font-style:italic;margin-top:8px;}
+
   @page{
     size: letter;
     margin: 3cm 2cm 3cm 4cm;
@@ -2207,57 +2244,147 @@ function maintUrgencyClass(nextDate){
   return '';
 }
 
+// Construye las filas de la tabla de especificaciones técnicas de un equipo,
+// a partir de los datos ya guardados en el registro de mantenimiento.
+function maintSpecsRowsHtml(specs){
+  if(!specs) return '';
+  const disco = [specs.diskType, specs.diskCapacity].filter(Boolean).join(' · ');
+  const so = [specs.os, specs.osVersion].filter(Boolean).join(' ');
+  const rows = [
+    ['Marca', specs.brand],
+    ['No. Serial', specs.serial],
+    ['Referencia', specs.reference],
+    ['Procesador', specs.processor],
+    ['Memoria RAM', specs.ram],
+    ['Disco', disco],
+    ['Sistema operativo', so],
+    ['Back Up', specs.backup ? (specs.backup==='si' ? 'Sí' : 'No') : ''],
+    ['Observaciones', specs.observaciones]
+  ].filter(([,v]) => v && String(v).trim());
+  if(rows.length===0) return '';
+  return rows.map(([label,val]) => `<tr><td>${escapeHtml(label)}</td><td>${escapeHtml(val)}</td></tr>`).join('');
+}
+
+// Tarjeta individual de un mantenimiento: resumen siempre visible (equipo,
+// marca/serial si existen, fecha, tipo) + detalle plegable con specs completas.
+function renderMaintRecordCard(m, typeLabel){
+  const specsRows = maintSpecsRowsHtml(m.specs);
+  const idTag = (m.specs && (m.specs.brand || m.specs.serial))
+    ? ` <span style="font-weight:400;color:var(--ink-soft);">· ${[m.specs.brand, m.specs.serial ? 'S/N '+m.specs.serial : ''].filter(Boolean).join(' · ')}</span>`
+    : '';
+  return `
+    <div class="maint-record-card ${maintUrgencyClass(m.nextDate)}" data-id="${m.id}">
+      <div class="maint-record-summary">
+        <div class="maint-record-summary-left">
+          <div class="maint-record-equipment">💻 ${escapeHtml(m.equipment)}${idTag}</div>
+          <div class="maint-record-meta">
+            <span class="maint-type-badge maint-type-${m.type}">${typeLabel[m.type]||m.type}</span>
+            <span>Realizado: ${m.date ? formatDisplayDate(m.date) : '—'}</span>
+            ${m.nextDate ? `<span class="maint-next-tag">Próximo: ${formatDisplayDate(m.nextDate)}</span>` : ''}
+          </div>
+        </div>
+        <div style="display:flex;align-items:flex-start;gap:2px;">
+          <div class="maint-record-actions">
+            <button class="maint-report" title="Generar informe de hallazgos" type="button">📋</button>
+            <button class="maint-delete" title="Eliminar" type="button">×</button>
+          </div>
+          <span class="maint-record-chevron">▾</span>
+        </div>
+      </div>
+      <div class="maint-record-details">
+        ${m.desc ? `<div class="maint-desc" style="margin-top:8px;">${escapeHtml(m.desc)}</div>` : ''}
+        <div class="maint-specs-title">Especificaciones técnicas del equipo</div>
+        ${specsRows ? `<table class="maint-specs-table">${specsRows}</table>` : '<p class="maint-specs-empty">Sin especificaciones técnicas registradas para este equipo.</p>'}
+        ${m.nextDate ? `
+        <div class="maint-reminder-row">
+          <button class="btn btn-small btn-ghost maint-remind" data-channel="whatsapp" type="button">📱 Recordar por WhatsApp</button>
+          <button class="btn btn-small btn-ghost maint-remind" data-channel="gmail" type="button">✉️ Recordar por Gmail</button>
+        </div>` : ''}
+      </div>
+    </div>
+  `;
+}
+
+// Listado de mantenimientos en formato acordeón: un grupo por cliente
+// (para ver de un vistazo cuántos equipos tiene y cuáles tienen mantenimiento
+// próximo/vencido), y dentro de cada cliente, una tarjeta plegable por
+// mantenimiento con las especificaciones técnicas del equipo atendido.
 function renderMaintList(){
   const list = $('maintList');
   const filterClientId = $('maintFilterClient').value;
   let records = [...maintenanceCache];
   if(filterClientId) records = records.filter(m=>m.clientId===filterClientId);
-  records.sort((a,b)=> (b.date||'').localeCompare(a.date||''));
 
   if(records.length===0){
     list.innerHTML = '<p class="history-empty">No hay mantenimientos registrados todavía.</p>';
     return;
   }
+
+  const groups = {};
+  records.forEach(m=>{
+    const key = m.clientId || ('__'+(m.clientName||'Cliente'));
+    if(!groups[key]) groups[key] = { clientName: m.clientName || 'Cliente', records: [] };
+    groups[key].records.push(m);
+  });
+  const groupList = Object.values(groups).sort((a,b)=> a.clientName.localeCompare(b.clientName, 'es'));
+  groupList.forEach(g => g.records.sort((a,b)=> (b.date||'').localeCompare(a.date||'')));
+
   const typeLabel = {preventivo:'Preventivo', correctivo:'Correctivo', predictivo:'Predictivo'};
-  list.innerHTML = records.map(m => `
-    <div class="maint-item ${maintUrgencyClass(m.nextDate)}" data-id="${m.id}">
-      <div class="maint-item-top">
-        <span class="maint-type-badge maint-type-${m.type}">${typeLabel[m.type]||m.type}</span>
-        <div style="display:flex;gap:4px;">
-          <button class="hist-dup maint-report" title="Generar informe de hallazgos" type="button">📋</button>
-          <button class="maint-delete" title="Eliminar" type="button">×</button>
-        </div>
+  const openByDefault = groupList.length === 1;
+
+  list.innerHTML = `<div class="maint-accordion">` + groupList.map(g=>{
+    const urgentCount = g.records.filter(m=>{
+      const cls = maintUrgencyClass(m.nextDate);
+      return cls === 'maint-overdue' || cls === 'maint-soon';
+    }).length;
+    return `
+    <div class="maint-client-acc${openByDefault ? ' open' : ''}">
+      <button class="maint-client-acc-header" type="button">
+        <span class="maint-client-acc-name">👤 ${escapeHtml(g.clientName)}</span>
+        <span class="maint-client-acc-right">
+          <span class="maint-client-acc-count">${g.records.length} equipo${g.records.length===1?'':'s'}${urgentCount ? ` · ⏰ ${urgentCount}` : ''}</span>
+          <span class="maint-client-acc-chevron">▾</span>
+        </span>
+      </button>
+      <div class="maint-client-acc-body">
+        ${g.records.map(m => renderMaintRecordCard(m, typeLabel)).join('')}
       </div>
-      <div class="h-client">${escapeHtml(m.clientName)}</div>
-      <div class="maint-equipment">${escapeHtml(m.equipment)}</div>
-      ${m.desc ? `<div class="maint-desc">${escapeHtml(m.desc)}</div>` : ''}
-      <div class="h-meta">Realizado: ${m.date ? formatDisplayDate(m.date) : '—'}</div>
-      ${m.nextDate ? `<div class="h-meta maint-next">Próximo: ${formatDisplayDate(m.nextDate)}</div>` : ''}
-      ${m.nextDate ? `
-      <div class="maint-reminder-row">
-        <button class="btn btn-small btn-ghost maint-remind" data-channel="whatsapp" type="button">📱 Recordar por WhatsApp</button>
-        <button class="btn btn-small btn-ghost maint-remind" data-channel="gmail" type="button">✉️ Recordar por Gmail</button>
-      </div>` : ''}
-    </div>
-  `).join('');
+    </div>`;
+  }).join('') + `</div>`;
+
+  list.querySelectorAll('.maint-client-acc-header').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      btn.closest('.maint-client-acc').classList.toggle('open');
+    });
+  });
+
+  list.querySelectorAll('.maint-record-summary').forEach(el=>{
+    el.addEventListener('click', e=>{
+      if(e.target.closest('.maint-record-actions')) return;
+      el.closest('.maint-record-card').classList.toggle('open');
+    });
+  });
 
   list.querySelectorAll('.maint-report').forEach(btn=>{
     btn.addEventListener('click', e=>{
-      const id = e.target.closest('.maint-item').dataset.id;
+      e.stopPropagation();
+      const id = e.target.closest('.maint-record-card').dataset.id;
       openFindingsModal(id);
     });
   });
 
   list.querySelectorAll('.maint-remind').forEach(btn=>{
     btn.addEventListener('click', e=>{
-      const id = e.target.closest('.maint-item').dataset.id;
+      e.stopPropagation();
+      const id = e.target.closest('.maint-record-card').dataset.id;
       sendMaintReminder(id, btn.dataset.channel);
     });
   });
 
   list.querySelectorAll('.maint-delete').forEach(btn=>{
     btn.addEventListener('click', e=>{
-      const id = e.target.closest('.maint-item').dataset.id;
+      e.stopPropagation();
+      const id = e.target.closest('.maint-record-card').dataset.id;
       deleteMaintenance(id);
     });
   });
